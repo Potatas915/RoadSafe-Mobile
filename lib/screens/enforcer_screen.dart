@@ -343,6 +343,9 @@ class _CaseScreenState extends State<_CaseScreen> {
   Timer? accessTimer;
   bool accessible = true;
   int accessGeneration = 0;
+  late Map<String, dynamic> currentReport = widget.report;
+  Map<String, dynamic>? medicalRecommendation;
+  String? medicalError;
   late String status;
   bool saving = false;
   String? error;
@@ -354,10 +357,33 @@ class _CaseScreenState extends State<_CaseScreen> {
         enforcerStatuses(widget.report, backend.userId).firstOrNull ??
         widget.report['status'] as String;
     accessible = enforcerStatuses(widget.report, backend.userId).isNotEmpty;
+    loadMedical();
     accessTimer = Timer.periodic(
       const Duration(seconds: 15),
       (_) => checkAccess(),
     );
+  }
+
+  Future<void> loadMedical() async {
+    if (currentReport['assignedOfficerId'] != backend.userId) return;
+    try {
+      final value = await widget.service.medicalRecommendation(
+        currentReport['id'] as String,
+      );
+      if (mounted && accessible) {
+        setState(() {
+          medicalRecommendation = value;
+          medicalError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          medicalRecommendation = null;
+          medicalError = 'Could not load hospital/clinic information. Retry.';
+        });
+      }
+    }
   }
 
   Future<void> checkAccess() async {
@@ -369,11 +395,20 @@ class _CaseScreenState extends State<_CaseScreen> {
           .where((r) => r['id'] == widget.report['id'])
           .firstOrNull;
       if (mounted && current == accessGeneration) {
-        setState(
-          () => accessible =
+        setState(() {
+          accessible =
               report != null &&
-              enforcerStatuses(report, backend.userId).isNotEmpty,
-        );
+              enforcerStatuses(report, backend.userId).isNotEmpty;
+          // Accept informational version updates without masking concurrent case edits.
+          if (accessible &&
+              report!['status'] == currentReport['status'] &&
+              report['assignedOfficerId'] ==
+                  currentReport['assignedOfficerId'] &&
+              report['officialRemarks'] == currentReport['officialRemarks']) {
+            currentReport = report;
+          }
+        });
+        if (accessible) await loadMedical();
       }
     } catch (_) {
       if (mounted && current == accessGeneration) {
@@ -396,7 +431,7 @@ class _CaseScreenState extends State<_CaseScreen> {
       error = null;
     });
     try {
-      await widget.service.update(widget.report, status, remarks.text);
+      await widget.service.update(currentReport, status, remarks.text);
       if (mounted) Navigator.pop(context);
     } catch (failure) {
       if (mounted) {
@@ -423,7 +458,7 @@ class _CaseScreenState extends State<_CaseScreen> {
         ),
       );
     }
-    final report = widget.report;
+    final report = currentReport;
     final coords = report['location']['coordinates'];
     final injuries = report['injuries'];
     return Scaffold(
@@ -460,6 +495,25 @@ class _CaseScreenState extends State<_CaseScreen> {
             label: const Text('View accident map'),
           ),
           Text('Incident time: ${report['occurredAt']}'),
+          if (report['assignedOfficerId'] == backend.userId) ...[
+            const SizedBox(height: 16),
+            MedicalRecommendationDetails(
+              recommendation: medicalRecommendation,
+              error: medicalError,
+              onRetry: loadMedical,
+              onMap: (lat, lng, name) => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => _SceneMap(
+                    latitude: lat,
+                    longitude: lng,
+                    title: name,
+                    facility: true,
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Text(report['description'] as String),
           Text(
@@ -575,18 +629,101 @@ class _CaseScreenState extends State<_CaseScreen> {
   }
 }
 
+class MedicalRecommendationDetails extends StatelessWidget {
+  const MedicalRecommendationDetails({
+    super.key,
+    this.recommendation,
+    this.error,
+    required this.onRetry,
+    required this.onMap,
+  });
+  final Map<String, dynamic>? recommendation;
+  final String? error;
+  final VoidCallback onRetry;
+  final void Function(double, double, String) onMap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nearby hospitals & clinics',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          if (error != null) ...[
+            Text(error!),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Retry facility information'),
+            ),
+          ] else if (recommendation == null)
+            const Text(
+              'No facility recommendation has been added for this case.',
+            )
+          else
+            ...((recommendation!['facilities'] as List?) ?? []).map((value) {
+              final facility = Map<String, dynamic>.from(value as Map);
+              final selected = facility['id'] == recommendation!['selectedId'];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${facility['name']}${selected ? ' · Recommended' : ''}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      '${facility['kind']} · ${(facility['distanceKm'] as num).toStringAsFixed(1)} km straight-line distance',
+                    ),
+                    Text(facility['address'] as String? ?? ''),
+                    SelectableText('${facility['lat']}, ${facility['lng']}'),
+                    TextButton.icon(
+                      onPressed: () => onMap(
+                        (facility['lat'] as num).toDouble(),
+                        (facility['lng'] as num).toDouble(),
+                        facility['name'] as String,
+                      ),
+                      icon: const Icon(Icons.local_hospital_outlined),
+                      label: const Text('View facility location'),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          const Text(
+            'Mapped locations only. Opening hours, capacity and acceptance are unconfirmed.',
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _SceneMap extends StatelessWidget {
-  const _SceneMap({required this.latitude, required this.longitude});
+  const _SceneMap({
+    required this.latitude,
+    required this.longitude,
+    this.title = 'Accident location',
+    this.facility = false,
+  });
   final double latitude, longitude;
+  final String title;
+  final bool facility;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Accident location')),
+    appBar: AppBar(title: Text(title)),
     body: Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
           child: SelectableText(
-            'Confirmed accident pin: $latitude, $longitude\nMap tiles require internet. This is the reported scene, not live enforcer tracking.',
+            facility
+                ? 'Mapped facility: $latitude, $longitude\nLocation information only. Capacity and acceptance are unconfirmed.'
+                : 'Confirmed accident pin: $latitude, $longitude\nMap tiles require internet. This is the reported scene, not live enforcer tracking.',
           ),
         ),
         Expanded(

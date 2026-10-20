@@ -27,6 +27,14 @@ List<String> enforcerStatuses(Map<String, dynamic> report, String? uid) {
 class EnforcerBackend {
   EnforcerBackend(this.backend);
   final RoadSafeBackend backend;
+  Future<Map<String, dynamic>?> medicalRecommendation(String reportId) async {
+    final result = await backend.client.rpc(
+      'get_medical_recommendation',
+      params: {'p_id': reportId},
+    );
+    return result == null ? null : Map<String, dynamic>.from(result as Map);
+  }
+
   Future<Map<String, dynamic>> context() async => Map<String, dynamic>.from(
     await backend.client.rpc('get_enforcer_context'),
   );
