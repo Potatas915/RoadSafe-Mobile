@@ -4,7 +4,8 @@ import 'backend.dart';
 import 'username.dart';
 
 class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key});
+  const AccountScreen({super.key, this.enforcer = false});
+  final bool enforcer;
   @override
   State<AccountScreen> createState() => _AccountScreenState();
 }
@@ -45,6 +46,14 @@ class _AccountScreenState extends State<AccountScreen> {
       } else {
         await backend.signIn(_username.text, _password.text);
       }
+      if (widget.enforcer) {
+        try {
+          await backend.client.rpc('get_enforcer_context');
+        } catch (_) {
+          await backend.signOut();
+          throw const AuthException('Active police Officer access is required. Ask an Admin to manage your account.');
+        }
+      }
       if (mounted) Navigator.pop(context, true);
     } on AuthException catch (error) {
       if (mounted) setState(() => _message = error.message);
@@ -63,7 +72,7 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(_register ? 'Create your account' : 'Sign in to RoadSafe'),
+      title: Text(widget.enforcer ? 'Enforcer sign in' : _register ? 'Create your account' : 'Sign in to RoadSafe'),
     ),
     body: SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -72,8 +81,8 @@ class _AccountScreenState extends State<AccountScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Your account keeps your reports and updates together. Your report draft stays here while you sign in.',
+            Text(
+              widget.enforcer ? 'Use your registered account. Enforcer access is assigned by an administrator.' : 'Your account keeps your reports and updates together. Your report draft stays here while you sign in.',
             ),
             const SizedBox(height: 24),
             TextFormField(
@@ -121,7 +130,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
               ),
             ),
-            TextButton(
+            if (!widget.enforcer) TextButton(
               onPressed: _busy
                   ? null
                   : () => setState(() {

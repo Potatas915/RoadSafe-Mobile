@@ -30,3 +30,9 @@ Registration now asks only for username and password, with immediate sign-in and
 ## R07 reporter policy
 
 New reports require full name and contact number (1–120 trimmed characters each), plus the existing sign-in. Both fields validate before review. Previously saved reports and their stable-ID retries retain optional legacy identities. Explicit server identity-policy rejections return the updated app to editable contact fields. Older clients submitting blanks are rejected by the new backend policy; update the app or restart the draft with both fields supplied. Admin-corrected incident facts and correction notifications appear through the existing tracking/updates flow.
+
+## Traffic enforcer response
+
+Use Traffic enforcer sign in with an existing active police Officer account managed by an Admin. Retained Officer sessions open the enforcer workspace; Public sessions retain public reporting/history. Admins must first open a police station on the web map to publish the loaded shared directory. Search/select a station, go On duty, and keep the app active to appear available in its station roster (30-second heartbeat; offline after 90 seconds). The affiliation is self-selected, not GPS presence.
+
+Admins assign a selected verified Existing report through its police-station card. My cases offers incident details, a read-only scene map, evidence and versioned progress/official remarks; Verify offers only eligible unassigned cases. Findings/actions use the existing remarks/history rather than new statuses or structured fields. Scene map tiles need internet. The development migration is `20261020090000_enforcer_stations.sql`; apply all migrations on other environments before using this feature. No background push or external emergency dispatch is implied.

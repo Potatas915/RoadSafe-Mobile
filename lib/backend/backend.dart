@@ -184,10 +184,10 @@ class RoadSafeBackend extends ChangeNotifier {
     );
   }
 
-  Future<List<Map<String, dynamic>>> reports() async {
+  Future<List<Map<String, dynamic>>> reports({bool ownOnly = true}) async {
     final feed = Map<String, dynamic>.from(await client.rpc('get_report_feed'));
     final catalog = await categories();
-    return (feed['data'] as List).map((item) {
+    return (feed['data'] as List).where((item) => !ownOnly || item['reporter']['userId'] == userId).map((item) {
       final report = Map<String, dynamic>.from(item as Map);
       report['categoryLabel'] =
           catalog

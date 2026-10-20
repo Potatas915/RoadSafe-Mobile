@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/roadsafe_theme.dart';
 import 'report_screen.dart';
 import '../backend/report_tracking.dart';
+import '../backend/account_screen.dart';
 
 /// Public landing page. Verification and dispatch belong to the web manager.
 class HomeScreen extends StatelessWidget {
@@ -51,6 +52,12 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 28),
                   _reportCard(context),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<bool>(builder: (_) => const AccountScreen(enforcer: true))),
+                    icon: const Icon(Icons.badge_outlined),
+                    label: const Text('Traffic enforcer sign in'),
+                  ),
                   const SizedBox(height: 28),
                   _safetyNote(),
                   const SizedBox(height: 32),

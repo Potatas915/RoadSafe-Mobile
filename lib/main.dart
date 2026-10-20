@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'backend/mobile_role_gate.dart';
 import 'theme/roadsafe_theme.dart';
 import 'backend/backend.dart';
 
@@ -18,7 +18,7 @@ class RoadSafeApp extends StatelessWidget {
       title: 'RoadSafe Mobile',
       debugShowCheckedModeBanner: false,
       theme: buildRoadSafeTheme(),
-      home: const HomeScreen(),
+      home: const MobileRoleGate(),
     );
   }
 }
