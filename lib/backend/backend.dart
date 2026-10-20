@@ -95,7 +95,7 @@ class RoadSafeBackend extends ChangeNotifier {
     await client.auth.signInWithPassword(email: identity, password: password);
   }
 
-  Future<bool> signUp(String username, String password) async {
+  Future<bool> signUp(String username, String password, {String accountType = 'Public'}) async {
     final canonical = normalizeUsername(username);
     if (!validUsername(canonical)) {
       throw const AuthException(
@@ -105,7 +105,7 @@ class RoadSafeBackend extends ChangeNotifier {
     try {
       await client.functions.invoke(
         'register-username',
-        body: {'username': canonical, 'password': password},
+        body: {'username': canonical, 'password': password, 'accountType': accountType},
       );
     } on FunctionException catch (error) {
       final details = error.details;
