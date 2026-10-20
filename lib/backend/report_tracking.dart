@@ -392,7 +392,22 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
+                                Text(
+                                  report['categoryLabel'] as String? ??
+                                      report['categoryId'] as String,
+                                ),
                                 Text(report['description'] as String),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Vehicles: ${report['vehicleStatus'] == 'not_applicable'
+                                      ? 'Not applicable'
+                                      : (report['vehicles'] as List? ?? []).isEmpty
+                                      ? 'Unknown'
+                                      : (report['vehicles'] as List).map((v) => '${v['count']} × ${v['type']}').join(', ')}',
+                                ),
+                                Text(
+                                  'Injured: ${report['injuries']?['injuredCount'] ?? 'Unknown'}; fatalities: ${report['injuries']?['fatalityCount'] ?? 'Unknown'}',
+                                ),
                                 const SizedBox(height: 8),
                                 SelectableText(
                                   'Reference: ${report['id']}',
@@ -408,6 +423,8 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
                                       'Team update: ${report['officialRemarks']}',
                                     ),
                                   ),
+                                if (report['isDuplicate'] == true)
+                                  const Text('Marked as a duplicate report'),
                                 if (report['rejectionReason'] != null)
                                   Text('Reason: ${report['rejectionReason']}'),
                                 if (report['status'] ==
@@ -433,7 +450,7 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
                                   (event) => Padding(
                                     padding: const EdgeInsets.only(bottom: 8),
                                     child: Text(
-                                      '${event['status'] ?? event['type']}\n${event['message']}\n${DateTime.parse(event['createdAt'] as String).toLocal()}',
+                                      '${event['type'] == 'facts_corrected' ? 'Incident facts corrected' : event['status'] ?? event['type']}\n${event['message']}\n${DateTime.parse(event['createdAt'] as String).toLocal()}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: RoadSafeColors.muted,

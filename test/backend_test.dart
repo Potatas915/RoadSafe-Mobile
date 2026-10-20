@@ -8,6 +8,34 @@ import 'package:roadsafe_mobile/backend/backend.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
+    'Structured submission preserves vehicle types and known casualty counts',
+    () {
+      final params = buildSubmissionParams(
+        submissionId: 'structured-id',
+        category: 'collision',
+        description: 'Observed crash',
+        latitude: 14.85,
+        longitude: 120.88,
+        occurredAt: DateTime.utc(2026, 10, 19),
+        injuries: 'fatal',
+        vehicleStatus: 'known',
+        vehicles: [
+          {'type': 'car', 'count': 2},
+          {'type': 'motorcycle', 'count': 1},
+        ],
+        injuredCount: 3,
+        fatalityCount: 1,
+      );
+      expect(params['p_vehicles'], [
+        {'type': 'car', 'count': 2},
+        {'type': 'motorcycle', 'count': 1},
+      ]);
+      expect(params['p_vehicle_status'], 'known');
+      expect(params['p_injured_count'], 3);
+      expect(params['p_fatality_count'], 1);
+    },
+  );
+  test(
     'Submission uses confirmed coordinates, UTC incident time and unknown counts without trusting client roles',
     () {
       final params = buildSubmissionParams(
@@ -25,6 +53,10 @@ void main() {
       expect(params['p_longitude'], 120.88);
       expect(params['p_occurred_at'], '2026-10-17T06:00:00.000Z');
       expect(params['p_contact'], isNull);
+      expect(params['p_vehicle_status'], 'unknown');
+      expect(params['p_vehicles'], isEmpty);
+      expect(params['p_injured_count'], isNull);
+      expect(params['p_fatality_count'], isNull);
       expect(params.containsKey('status'), isFalse);
       expect(params.containsKey('reporter_id'), isFalse);
       expect(params.containsKey('verified_by'), isFalse);

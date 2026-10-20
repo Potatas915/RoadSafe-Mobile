@@ -6,9 +6,18 @@ import '../widgets/incident_location_picker.dart';
 import '../widgets/evidence_section.dart';
 import '../backend/backend.dart';
 import '../backend/account_screen.dart';
+import '../backend/categories.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportScreen extends StatefulWidget {
-  const ReportScreen({super.key, this.locationPickerBuilder});
+  const ReportScreen({
+    super.key,
+    this.locationPickerBuilder,
+    this.categoryLoader,
+  });
+
+  @visibleForTesting
+  final Future<List<AccidentCategory>> Function()? categoryLoader;
 
   @visibleForTesting
   final Widget Function(
@@ -37,7 +46,73 @@ class _ReportScreenState extends State<ReportScreen> {
   final _scroll = ScrollController();
   int _step = 0;
   String? _category;
+  List<AccidentCategory> _catalog = defaultCategories;
+  String? _categoryError;
+  bool _loadingCategories = false;
+  String _categoryLabel(String id) =>
+      _catalog.firstWhere((row) => row.id == id).label;
+  Future<void> _loadCategories() async {
+    if (!RoadSafeBackend.instance.ready && widget.categoryLoader == null) {
+      return;
+    }
+    setState(() {
+      _loadingCategories = true;
+    });
+    try {
+      final catalog =
+          await (widget.categoryLoader?.call() ??
+              RoadSafeBackend.instance.categories());
+      if (mounted) {
+        setState(() {
+          _catalog = catalog;
+          _categoryError = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _categoryError =
+              'Could not load current categories. Check your connection and retry.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingCategories = false;
+        });
+      }
+    }
+  }
+
   String _injuries = 'Not sure';
+  String _vehicleStatus = 'unknown';
+  final Map<String, int> _vehicles = {};
+  final _injuredCount = TextEditingController();
+  final _fatalityCount = TextEditingController();
+  static const _vehicleTypes = [
+    'car',
+    'motorcycle',
+    'tricycle',
+    'jeepney',
+    'van',
+    'bus',
+    'truck',
+    'bicycle',
+    'other',
+    'unknown',
+  ];
+  String get _injuryStatus => _injuries == 'No injuries'
+      ? 'none'
+      : _injuries == 'Someone is hurt'
+      ? 'injured'
+      : _injuries == 'Fatality reported'
+      ? 'fatal'
+      : 'unknown';
+  String get _vehicleSummary => _vehicleStatus == 'unknown'
+      ? 'Unknown'
+      : _vehicleStatus == 'not_applicable'
+      ? 'Not applicable'
+      : _vehicles.entries.map((e) => '${e.value} × ${e.key}').join(', ');
   static const _categories = <String, (String, IconData)>{
     'collision': ('Collision', Icons.car_crash_outlined),
     'hit-and-run': ('Hit-and-run', Icons.directions_car_outlined),
@@ -49,6 +124,7 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void initState() {
     super.initState();
+    _loadCategories();
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       _evidence.recoverLostPhotos();
     }
@@ -56,7 +132,13 @@ class _ReportScreenState extends State<ReportScreen> {
 
   @override
   void dispose() {
-    for (final controller in [_description, _name, _contact]) {
+    for (final controller in [
+      _description,
+      _name,
+      _contact,
+      _injuredCount,
+      _fatalityCount,
+    ]) {
       controller.dispose();
     }
     _evidence.dispose();
@@ -132,11 +214,21 @@ class _ReportScreenState extends State<ReportScreen> {
         latitude: _confirmedLocation!.latitude,
         longitude: _confirmedLocation!.longitude,
         occurredAt: _incidentAt ?? DateTime.now(),
-        injuries: _injuries == 'No injuries'
-            ? 'none'
-            : _injuries == 'Someone is hurt'
-            ? 'injured'
-            : 'unknown',
+        injuries: _injuryStatus,
+        vehicleStatus: _vehicleStatus,
+        vehicles: _vehicleStatus == 'known'
+            ? _vehicles.entries
+                  .map(
+                    (e) => <String, dynamic>{'type': e.key, 'count': e.value},
+                  )
+                  .toList()
+            : [],
+        injuredCount: ['injured', 'fatal'].contains(_injuryStatus)
+            ? int.tryParse(_injuredCount.text)
+            : null,
+        fatalityCount: _injuryStatus == 'fatal'
+            ? int.tryParse(_fatalityCount.text)
+            : null,
         name: _name.text,
         contact: _contact.text,
       );
@@ -166,6 +258,21 @@ class _ReportScreenState extends State<ReportScreen> {
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
+      if (error is PostgrestException &&
+          error.message.startsWith('This category is unavailable.') &&
+          _submission.reportId == null) {
+        _submittedParams = null;
+        await _loadCategories();
+        if (mounted) _goTo(0);
+      }
+      if (error is PostgrestException &&
+          error.message.startsWith(
+            'Full name and contact number are required',
+          ) &&
+          _submission.reportId == null) {
+        _submittedParams = null;
+        if (mounted) _goTo(1);
+      }
       if (mounted) {
         setState(
           () => _submissionMessage = _submission.reportId == null
@@ -185,6 +292,32 @@ class _ReportScreenState extends State<ReportScreen> {
         : _locationKey.currentState!.validate();
     if (valid) _goTo(_step + 1);
   }
+
+  Widget _countField(
+    String label,
+    TextEditingController controller,
+    int minimum,
+  ) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: 'Optional — leave blank if unknown',
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) return null;
+        final count = int.tryParse(value);
+        return !RegExp(r'^\d+$').hasMatch(value) ||
+                count == null ||
+                count < minimum ||
+                count > 999
+            ? 'Enter a whole number from $minimum to 999, or leave blank'
+            : null;
+      },
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -346,72 +479,90 @@ class _ReportScreenState extends State<ReportScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _label('What kind of accident?'),
+        if (_loadingCategories) const LinearProgressIndicator(),
+        if (_categoryError != null) Text(_categoryError!),
+        if (RoadSafeBackend.instance.ready || widget.categoryLoader != null)
+          TextButton(
+            onPressed: _loadingCategories ? null : _loadCategories,
+            child: const Text('Refresh categories'),
+          ),
         FormField<String>(
-          validator: (_) =>
-              _category == null ? 'Select an accident type' : null,
+          validator: (_) => _loadingCategories || _categoryError != null
+              ? 'Refresh categories before continuing'
+              : _category == null
+              ? 'Select an accident type'
+              : !_catalog.any((row) => row.id == _category && row.enabled)
+              ? 'Select an available accident type'
+              : null,
           builder: (field) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ..._categories.entries.map((entry) {
-                final selected = _category == entry.key;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Material(
-                    color: selected
-                        ? RoadSafeColors.orange.withValues(alpha: 0.09)
-                        : RoadSafeColors.card,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(
-                        color: selected
-                            ? RoadSafeColors.orange
-                            : RoadSafeColors.border,
-                      ),
+              ..._categories.entries
+                  .where(
+                    (entry) => _catalog.any(
+                      (row) => row.id == entry.key && row.enabled,
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Semantics(
-                      selected: selected,
-                      child: InkWell(
-                        onTap: () {
-                          setState(() => _category = entry.key);
-                          field.didChange(entry.key);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Icon(
-                                entry.value.$2,
-                                color: selected
-                                    ? RoadSafeColors.orange
-                                    : RoadSafeColors.muted,
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Text(
-                                  entry.value.$1,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
+                  )
+                  .map((entry) {
+                    final selected = _category == entry.key;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Material(
+                        color: selected
+                            ? RoadSafeColors.orange.withValues(alpha: 0.09)
+                            : RoadSafeColors.card,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: BorderSide(
+                            color: selected
+                                ? RoadSafeColors.orange
+                                : RoadSafeColors.border,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Semantics(
+                          selected: selected,
+                          child: InkWell(
+                            onTap: () {
+                              setState(() => _category = entry.key);
+                              field.didChange(entry.key);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    entry.value.$2,
+                                    color: selected
+                                        ? RoadSafeColors.orange
+                                        : RoadSafeColors.muted,
                                   ),
-                                ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Text(
+                                      _categoryLabel(entry.key),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    selected
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_off,
+                                    size: 20,
+                                    color: selected
+                                        ? RoadSafeColors.orange
+                                        : RoadSafeColors.muted,
+                                  ),
+                                ],
                               ),
-                              Icon(
-                                selected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_off,
-                                size: 20,
-                                color: selected
-                                    ? RoadSafeColors.orange
-                                    : RoadSafeColors.muted,
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              }),
+                    );
+                  }),
               if (field.hasError)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -451,18 +602,97 @@ class _ReportScreenState extends State<ReportScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: ['Not sure', 'No injuries', 'Someone is hurt']
-              .map(
-                (label) => ChoiceChip(
-                  label: Text(label),
-                  selected: _injuries == label,
-                  onSelected: (_) => setState(() => _injuries = label),
-                  selectedColor: RoadSafeColors.orange.withValues(alpha: 0.16),
-                  showCheckmark: true,
-                ),
-              )
-              .toList(),
+          children:
+              [
+                    'Not sure',
+                    'No injuries',
+                    'Someone is hurt',
+                    'Fatality reported',
+                  ]
+                  .map(
+                    (label) => ChoiceChip(
+                      label: Text(label),
+                      selected: _injuries == label,
+                      onSelected: (_) => setState(() {
+                        _injuries = label;
+                        _injuredCount.clear();
+                        _fatalityCount.clear();
+                      }),
+                      selectedColor: RoadSafeColors.orange.withValues(
+                        alpha: 0.16,
+                      ),
+                      showCheckmark: true,
+                    ),
+                  )
+                  .toList(),
         ),
+        const SizedBox(height: 24),
+        if (['injured', 'fatal'].contains(_injuryStatus))
+          _countField(
+            'Known injured count',
+            _injuredCount,
+            _injuryStatus == 'injured' ? 1 : 0,
+          ),
+        if (_injuryStatus == 'fatal')
+          _countField('Known fatality count', _fatalityCount, 1),
+        _label('Vehicles involved'),
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: _vehicleStatus,
+          items: const [
+            DropdownMenuItem(value: 'unknown', child: Text('Not sure')),
+            DropdownMenuItem(
+              value: 'not_applicable',
+              child: Text('Not applicable — no vehicles'),
+            ),
+            DropdownMenuItem(
+              value: 'known',
+              child: Text(
+                'Known types and counts',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          onChanged: (value) => setState(() => _vehicleStatus = value!),
+          validator: (_) => _vehicleStatus == 'known' && _vehicles.isEmpty
+              ? 'Add at least one vehicle type and count'
+              : null,
+        ),
+        if (_vehicleStatus == 'known') ...[
+          const Text(
+            'Use unknown type when the count is known but the type is not. Select Not sure above when counts are unknown.',
+          ),
+          for (final type in _vehicleTypes)
+            Row(
+              children: [
+                Expanded(child: Text(type)),
+                IconButton(
+                  tooltip: 'Remove $type',
+                  onPressed: (_vehicles[type] ?? 0) == 0
+                      ? null
+                      : () => setState(() {
+                          final n = _vehicles[type]! - 1;
+                          if (n == 0) {
+                            _vehicles.remove(type);
+                          } else {
+                            _vehicles[type] = n;
+                          }
+                        }),
+                  icon: const Icon(Icons.remove),
+                ),
+                Text('${_vehicles[type] ?? 0}'),
+                IconButton(
+                  tooltip: 'Add $type',
+                  onPressed: (_vehicles[type] ?? 0) >= 999
+                      ? null
+                      : () => setState(
+                          () => _vehicles[type] = (_vehicles[type] ?? 0) + 1,
+                        ),
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+        ],
         const SizedBox(height: 24),
         _label('What happened?'),
         TextFormField(
@@ -533,9 +763,16 @@ class _ReportScreenState extends State<ReportScreen> {
           },
         ),
         const SizedBox(height: 28),
-        _label('Your name (optional)'),
+        _label('Full name (required)'),
         TextFormField(
           controller: _name,
+          key: const Key('reporter-name'),
+          maxLength: 120,
+          validator: (value) => value == null || value.trim().isEmpty
+              ? 'Enter your full name'
+              : value.trim().length > 120
+              ? 'Use at most 120 characters'
+              : null,
           textCapitalization: TextCapitalization.words,
           autofillHints: const [AutofillHints.name],
           decoration: const InputDecoration(
@@ -543,9 +780,16 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        _label('Contact number (optional)'),
+        _label('Contact number (required)'),
         TextFormField(
           controller: _contact,
+          key: const Key('reporter-contact'),
+          maxLength: 120,
+          validator: (value) => value == null || value.trim().isEmpty
+              ? 'Enter your contact number'
+              : value.trim().length > 120
+              ? 'Use at most 120 characters'
+              : null,
           keyboardType: TextInputType.phone,
           autofillHints: const [AutofillHints.telephoneNumber],
           decoration: const InputDecoration(
@@ -556,7 +800,7 @@ class _ReportScreenState extends State<ReportScreen> {
         _notice(
           Icons.info_outline,
           'Why share contact details?',
-          'The team may need to clarify your report. You can leave these fields empty.',
+          'Your full name and contact number are required so the team can clarify your report.',
         ),
       ],
     ),
@@ -588,9 +832,20 @@ class _ReportScreenState extends State<ReportScreen> {
               ],
             ),
             const Divider(height: 32),
-            _summary('Accident type', _categories[_category]!.$1),
+            _summary('Accident type', _categoryLabel(_category!)),
             _summary('Incident time', _incidentTimeLabel()),
             _summary('Injuries', _injuries),
+            if (['injured', 'fatal'].contains(_injuryStatus))
+              _summary(
+                'Injured count',
+                _injuredCount.text.isEmpty ? 'Unknown' : _injuredCount.text,
+              ),
+            if (_injuryStatus == 'fatal')
+              _summary(
+                'Fatality count',
+                _fatalityCount.text.isEmpty ? 'Unknown' : _fatalityCount.text,
+              ),
+            _summary('Vehicles', _vehicleSummary),
             _summary('What happened', _description.text.trim()),
             _summary(
               'Accident coordinates',

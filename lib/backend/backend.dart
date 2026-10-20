@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../widgets/evidence_section.dart';
 import 'username.dart';
+import 'categories.dart';
 
 Map<String, dynamic> buildSubmissionParams({
   required String submissionId,
@@ -15,6 +16,10 @@ Map<String, dynamic> buildSubmissionParams({
   required String injuries,
   String? name,
   String? contact,
+  String vehicleStatus = 'unknown',
+  List<Map<String, dynamic>> vehicles = const [],
+  int? injuredCount,
+  int? fatalityCount,
 }) {
   String? optional(String? value) =>
       value == null || value.trim().isEmpty ? null : value.trim();
@@ -28,6 +33,10 @@ Map<String, dynamic> buildSubmissionParams({
     'p_injuries': injuries,
     'p_name': optional(name),
     'p_contact': optional(contact),
+    'p_vehicle_status': vehicleStatus,
+    'p_vehicles': vehicles,
+    'p_injured_count': injuredCount,
+    'p_fatality_count': fatalityCount,
   };
 }
 
@@ -169,11 +178,25 @@ class RoadSafeBackend extends ChangeNotifier {
     );
   }
 
+  Future<List<AccidentCategory>> categories() async {
+    return parseCategories(
+      await client.from('accident_categories').select('id,label,enabled'),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> reports() async {
     final feed = Map<String, dynamic>.from(await client.rpc('get_report_feed'));
-    return (feed['data'] as List)
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList();
+    final catalog = await categories();
+    return (feed['data'] as List).map((item) {
+      final report = Map<String, dynamic>.from(item as Map);
+      report['categoryLabel'] =
+          catalog
+              .where((row) => row.id == report['categoryId'])
+              .firstOrNull
+              ?.label ??
+          report['categoryId'];
+      return report;
+    }).toList();
   }
 
   Future<List<Map<String, dynamic>>> notifications() async {

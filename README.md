@@ -26,3 +26,7 @@ Public Supabase configuration defaults to the connected development project. Ove
 Android foreground location/internet permissions are configured. Camera/gallery uses image_picker and Android system pickers. There is no iOS runner in this workspace; a future iOS runner needs location, camera, and photo-library usage descriptions. Native camera/map/GPS behavior still requires device testing. An internet connection is needed for map tiles, authentication, submissions, and updates.
 
 Registration now asks only for username and password, with immediate sign-in and no confirmation email. Usernames are case-insensitive and must start with a letter, using 3–24 letters, numbers, or underscores. Existing email-based accounts can still use their original email in the Username sign-in field. Supabase Auth remains responsible for password hashing and sessions; the server creates internal identities without sending email.
+
+## R07 reporter policy
+
+New reports require full name and contact number (1–120 trimmed characters each), plus the existing sign-in. Both fields validate before review. Previously saved reports and their stable-ID retries retain optional legacy identities. Explicit server identity-policy rejections return the updated app to editable contact fields. Older clients submitting blanks are rejected by the new backend policy; update the app or restart the draft with both fields supplied. Admin-corrected incident facts and correction notifications appear through the existing tracking/updates flow.

@@ -45,6 +45,21 @@ Future<void> pumpReportWithTestMap(WidgetTester tester) async {
   );
 }
 
+Future<void> enterReporter(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('reporter-name')));
+  await tester.enterText(
+    find.byKey(const Key('reporter-name')),
+    'Fixture Reporter',
+  );
+  await tester.ensureVisible(find.byKey(const Key('reporter-contact')));
+  await tester.enterText(
+    find.byKey(const Key('reporter-contact')),
+    '09000000000',
+  );
+  tester.testTextInput.hide();
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -60,6 +75,81 @@ void main() {
           null,
         );
   });
+  testWidgets('Known injury counts reject zero and accept an unknown blank', (
+    tester,
+  ) async {
+    await pumpReportWithTestMap(tester);
+    await tester.tap(find.text('Collision'));
+    await tester.ensureVisible(find.text('Someone is hurt'));
+    await tester.tap(find.text('Someone is hurt'));
+    await tester.pumpAndSettle();
+    final count = find.widgetWithText(TextFormField, 'Known injured count');
+    await tester.ensureVisible(count);
+    await tester.enterText(count, '0');
+    await tester.ensureVisible(find.byKey(const Key('description')));
+    await tester.enterText(
+      find.byKey(const Key('description')),
+      'Observed crash',
+    );
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Continue'));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Enter a whole number from 1 to 999, or leave blank'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(count);
+    await tester.enterText(count, '');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Continue'));
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm test pin'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Vehicle counts are required for known details and survive review',
+    (tester) async {
+      await pumpReportWithTestMap(tester);
+      await tester.tap(find.text('Collision'));
+      await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Known types and counts').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('description')));
+      await tester.enterText(
+        find.byKey(const Key('description')),
+        'Observed crash',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Add at least one vehicle type and count'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.byTooltip('Add car'));
+      await tester.tap(find.byTooltip('Add car'));
+      await tester.tap(find.byTooltip('Add car'));
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Confirm test pin'));
+      await tester.tap(find.text('Confirm test pin'));
+      await enterReporter(tester);
+      await tester.ensureVisible(find.text('Review report'));
+      await tester.tap(find.text('Review report'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 × car'), findsOneWidget);
+    },
+  );
+
   testWidgets('Home opens reporting and provides a way back', (tester) async {
     await tester.pumpWidget(const RoadSafeApp());
     expect(find.text('A little action.\nA safer community.'), findsOneWidget);
@@ -98,6 +188,7 @@ void main() {
     (tester) async {
       await pumpReportWithTestMap(tester);
       await enterDetails(tester);
+      await enterReporter(tester);
       await tester.ensureVisible(find.text('Review report'));
       await tester.tap(find.text('Review report'));
       await tester.pumpAndSettle();
@@ -108,6 +199,7 @@ void main() {
       await tester.ensureVisible(find.text('Confirm test pin'));
       await tester.tap(find.text('Confirm test pin'));
       await tester.pumpAndSettle();
+      await enterReporter(tester);
       await tester.ensureVisible(find.text('Review report'));
       await tester.tap(find.text('Review report'));
       await tester.pumpAndSettle();
@@ -121,6 +213,7 @@ void main() {
       await tester.ensureVisible(find.text('Move test pin'));
       await tester.tap(find.text('Move test pin'));
       await tester.pumpAndSettle();
+      await enterReporter(tester);
       await tester.ensureVisible(find.text('Review report'));
       await tester.tap(find.text('Review report'));
       await tester.pumpAndSettle();
@@ -151,6 +244,7 @@ void main() {
     await tester.ensureVisible(find.text('Confirm test pin'));
     await tester.tap(find.text('Confirm test pin'));
     await tester.pumpAndSettle();
+    await enterReporter(tester);
     await tester.ensureVisible(find.text('Review report'));
     await tester.tap(find.text('Review report'));
     await tester.pumpAndSettle();
