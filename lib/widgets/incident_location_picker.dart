@@ -117,6 +117,8 @@ class _IncidentLocationPickerState extends State<IncidentLocationPicker> {
   @override
   void dispose() {
     _request++;
+    _ready = false;
+    _map = null;
     _selection.dispose();
     super.dispose();
   }
@@ -132,9 +134,11 @@ class _IncidentLocationPickerState extends State<IncidentLocationPicker> {
       if (!mounted || request != _request) return;
       _selection.select(point);
       widget.onChanged(null);
-      // A map is recreated only after leaving this step; onMapCreated handles
-      // GPS results that arrive before the native map is ready.
-      await _map?.moveCamera(CameraUpdate.newLatLngZoom(point, _streetZoom));
+      // The style-loaded callback handles GPS results that arrive before
+      // the native map is ready.
+      if (_ready) {
+        await _map?.moveCamera(CameraUpdate.newLatLngZoom(point, _streetZoom));
+      }
       if (!mounted || request != _request) return;
       setState(
         () => _message =
@@ -176,7 +180,7 @@ class _IncidentLocationPickerState extends State<IncidentLocationPicker> {
 
   void _cameraMoved(CameraPosition position) {
     // Do not treat the fallback camera's initial position as a chosen incident.
-    if (!_ready) return;
+    if (!mounted || !_ready) return;
     if (_selection.target == position.target) return;
     _request++; // A late GPS result must not overwrite a manually chosen spot.
     _locating = false;
@@ -226,9 +230,11 @@ class _IncidentLocationPickerState extends State<IncidentLocationPicker> {
                     ),
                   },
                   onMapCreated: (controller) {
+                    if (!mounted) return;
                     _map = controller;
                   },
                   onStyleLoadedCallback: () async {
+                    if (!mounted) return;
                     await _map?.moveCamera(
                       CameraUpdate.newLatLngZoom(
                         _selection.target,
@@ -239,9 +245,10 @@ class _IncidentLocationPickerState extends State<IncidentLocationPicker> {
                   },
                   onCameraMove: _cameraMoved,
                   onCameraIdle: () {
-                    if (_ready) _selection.setMoving(false);
+                    if (mounted && _ready) _selection.setMoving(false);
                   },
                   onMapClick: (_, point) async {
+                    if (!mounted || !_ready) return;
                     _request++;
                     setState(() => _locating = false);
                     _selection.select(point);
