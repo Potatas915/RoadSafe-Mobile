@@ -126,9 +126,8 @@ void main() {
       await tester.tap(find.text('New here? Create an account'));
       await tester.pumpAndSettle();
       expect(find.text('Create your account'), findsOneWidget);
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Traffic enforcer').last);
+      await tester.ensureVisible(find.byKey(const Key('account-type-Officer')));
+      await tester.tap(find.byKey(const Key('account-type-Officer')));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(TextFormField).at(0),

@@ -53,7 +53,7 @@ void main() {
       expect(find.text('Road collision'), findsOneWidget);
       await tester.tap(find.text('Road collision'));
       disabled = true;
-      await tester.tap(find.text('Refresh categories'));
+      await tester.tap(find.byTooltip('Refresh categories'));
       await tester.pumpAndSettle();
       expect(find.text('Road collision'), findsNothing);
       expect(find.text('Other accident'), findsOneWidget);
@@ -85,7 +85,7 @@ void main() {
       findsOneWidget,
     );
     fail = false;
-    await tester.tap(find.text('Refresh categories'));
+    await tester.tap(find.byTooltip('Refresh categories'));
     await tester.pumpAndSettle();
     expect(
       find.textContaining('Could not load current categories'),

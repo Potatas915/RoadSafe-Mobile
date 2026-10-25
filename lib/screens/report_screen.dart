@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../theme/roadsafe_theme.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../widgets/incident_location_picker.dart';
 import '../widgets/evidence_section.dart';
+import '../widgets/roadsafe_logo.dart';
 import '../backend/backend.dart';
 import '../backend/account_screen.dart';
 import '../backend/categories.dart';
+import '../backend/reporter_validation.dart';
+import 'my_reports_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ReportScreen extends StatefulWidget {
@@ -240,23 +244,35 @@ class _ReportScreenState extends State<ReportScreen> {
         _submission.uploaded.add(id);
       }
       if (!mounted) return;
-      await showDialog<void>(
+      final viewReports = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: const Text('Report received'),
           content: Text(
-            'Reference: ${_submission.reportId}\n\nYour report is saved and awaiting verification. Track its progress under Your reports.',
+            'Reference: ${_submission.reportId}\n\nYour report is saved and awaiting verification. You can follow its progress under My reports.',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Done'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('View my reports'),
             ),
           ],
         ),
       );
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+      if (viewReports == true) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(builder: (_) => const MyReportsScreen()),
+        );
+      } else {
+        Navigator.pop(context, true);
+      }
     } catch (error) {
       if (error is PostgrestException &&
           error.message.startsWith('This category is unavailable.') &&
@@ -347,7 +363,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           const SizedBox(height: 28),
                           Text(
                             [
-                              'Report an accident',
+                              'Report an incident',
                               'Where did it happen?',
                               'Check your report',
                             ][_step],
@@ -401,20 +417,7 @@ class _ReportScreenState extends State<ReportScreen> {
             onPressed: _sending ? null : () => Navigator.of(context).pop(),
             icon: const Icon(Icons.arrow_back),
           ),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
-            ),
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: const Icon(
-            Icons.shield_outlined,
-            size: 23,
-            color: Colors.white,
-          ),
-        ),
+        const RoadSafeLogo(size: 44),
         const SizedBox(width: 12),
         const Expanded(
           child: Column(
@@ -478,13 +481,37 @@ class _ReportScreenState extends State<ReportScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label('What kind of accident?'),
-        if (_loadingCategories) const LinearProgressIndicator(),
-        if (_categoryError != null) Text(_categoryError!),
-        if (RoadSafeBackend.instance.ready || widget.categoryLoader != null)
-          TextButton(
-            onPressed: _loadingCategories ? null : _loadCategories,
-            child: const Text('Refresh categories'),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'What kind of accident?',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ),
+            if (RoadSafeBackend.instance.ready ||
+                widget.categoryLoader != null)
+              IconButton(
+                tooltip: 'Refresh categories',
+                visualDensity: VisualDensity.compact,
+                onPressed: _loadingCategories ? null : _loadCategories,
+                icon: const Icon(Icons.refresh, size: 20),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_loadingCategories)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: LinearProgressIndicator(),
+          ),
+        if (_categoryError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              _categoryError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         FormField<String>(
           validator: (_) => _loadingCategories || _categoryError != null
@@ -636,63 +663,87 @@ class _ReportScreenState extends State<ReportScreen> {
         if (_injuryStatus == 'fatal')
           _countField('Known fatality count', _fatalityCount, 1),
         _label('Vehicles involved'),
-        DropdownButtonFormField<String>(
-          isExpanded: true,
-          initialValue: _vehicleStatus,
-          items: const [
-            DropdownMenuItem(value: 'unknown', child: Text('Not sure')),
-            DropdownMenuItem(
-              value: 'not_applicable',
-              child: Text('Not applicable — no vehicles'),
-            ),
-            DropdownMenuItem(
-              value: 'known',
-              child: Text(
-                'Known types and counts',
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-          onChanged: (value) => setState(() => _vehicleStatus = value!),
+        FormField<String>(
           validator: (_) => _vehicleStatus == 'known' && _vehicles.isEmpty
               ? 'Add at least one vehicle type and count'
               : null,
-        ),
-        if (_vehicleStatus == 'known') ...[
-          const Text(
-            'Use unknown type when the count is known but the type is not. Select Not sure above when counts are unknown.',
-          ),
-          for (final type in _vehicleTypes)
-            Row(
-              children: [
-                Expanded(child: Text(type)),
-                IconButton(
-                  tooltip: 'Remove $type',
-                  onPressed: (_vehicles[type] ?? 0) == 0
-                      ? null
-                      : () => setState(() {
-                          final n = _vehicles[type]! - 1;
-                          if (n == 0) {
-                            _vehicles.remove(type);
-                          } else {
-                            _vehicles[type] = n;
-                          }
-                        }),
-                  icon: const Icon(Icons.remove),
+          builder: (field) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final option in const [
+                    ('unknown', 'Not sure'),
+                    ('known', 'I know the vehicles'),
+                    ('not_applicable', 'No vehicles'),
+                  ])
+                    ChoiceChip(
+                      key: Key('vehicle-status-${option.$1}'),
+                      label: Text(option.$2),
+                      selected: _vehicleStatus == option.$1,
+                      selectedColor: RoadSafeColors.orange,
+                      labelStyle: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: _vehicleStatus == option.$1
+                            ? Colors.white
+                            : null,
+                      ),
+                      showCheckmark: false,
+                      onSelected: (_) =>
+                          setState(() => _vehicleStatus = option.$1),
+                    ),
+                ],
+              ),
+              if (_vehicleStatus == 'known') ...[
+                const SizedBox(height: 14),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = (constraints.maxWidth - 10) / 2;
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final type in _vehicleTypes)
+                          SizedBox(
+                            width: width,
+                            child: _vehicleTile(type),
+                          ),
+                      ],
+                    );
+                  },
                 ),
-                Text('${_vehicles[type] ?? 0}'),
-                IconButton(
-                  tooltip: 'Add $type',
-                  onPressed: (_vehicles[type] ?? 0) >= 999
-                      ? null
-                      : () => setState(
-                          () => _vehicles[type] = (_vehicles[type] ?? 0) + 1,
-                        ),
-                  icon: const Icon(Icons.add),
+                const SizedBox(height: 10),
+                Text(
+                  _vehicles.isEmpty
+                      ? 'Tap + on each vehicle type involved. Use "Unknown type" when you can count them but are unsure what they are.'
+                      : 'Total: ${_vehicles.values.fold<int>(0, (a, b) => a + b)} vehicle${_vehicles.values.fold<int>(0, (a, b) => a + b) == 1 ? '' : 's'}',
+                  style: TextStyle(
+                    color: _vehicles.isEmpty
+                        ? RoadSafeColors.muted
+                        : RoadSafeColors.orange,
+                    fontSize: 12,
+                    height: 1.5,
+                    fontWeight:
+                        _vehicles.isEmpty ? FontWeight.w400 : FontWeight.w700,
+                  ),
                 ),
               ],
-            ),
-        ],
+              if (field.hasError && _vehicleStatus == 'known' && _vehicles.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    field.errorText!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 24),
         _label('What happened?'),
         TextFormField(
@@ -767,16 +818,18 @@ class _ReportScreenState extends State<ReportScreen> {
         TextFormField(
           controller: _name,
           key: const Key('reporter-name'),
-          maxLength: 120,
-          validator: (value) => value == null || value.trim().isEmpty
-              ? 'Enter your full name'
-              : value.trim().length > 120
-              ? 'Use at most 120 characters'
-              : null,
+          maxLength: 60,
+          validator: validateReporterName,
           textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
           autofillHints: const [AutofillHints.name],
+          inputFormatters: [
+            FilteringTextInputFormatter.deny(RegExp(r'[0-9]')),
+          ],
           decoration: const InputDecoration(
-            hintText: 'How should we address you?',
+            hintText: 'e.g. Juan Dela Cruz',
+            helperText: 'First and last name, letters only',
+            counterText: '',
           ),
         ),
         const SizedBox(height: 20),
@@ -784,16 +837,18 @@ class _ReportScreenState extends State<ReportScreen> {
         TextFormField(
           controller: _contact,
           key: const Key('reporter-contact'),
-          maxLength: 120,
-          validator: (value) => value == null || value.trim().isEmpty
-              ? 'Enter your contact number'
-              : value.trim().length > 120
-              ? 'Use at most 120 characters'
-              : null,
+          maxLength: 20,
+          validator: validateReporterContact,
           keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
           autofillHints: const [AutofillHints.telephoneNumber],
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s().]')),
+          ],
           decoration: const InputDecoration(
-            hintText: 'A number the team can reach you on',
+            hintText: 'e.g. 0917 123 4567',
+            helperText: 'A number the team can reach you on',
+            counterText: '',
           ),
         ),
         const SizedBox(height: 20),
@@ -960,6 +1015,100 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
     ),
   );
+
+  static const _vehicleInfo = <String, (String, IconData)>{
+    'car': ('Car', Icons.directions_car_outlined),
+    'motorcycle': ('Motorcycle', Icons.two_wheeler),
+    'tricycle': ('Tricycle', Icons.electric_rickshaw_outlined),
+    'jeepney': ('Jeepney', Icons.directions_bus_filled_outlined),
+    'van': ('Van', Icons.airport_shuttle_outlined),
+    'bus': ('Bus', Icons.directions_bus_outlined),
+    'truck': ('Truck', Icons.local_shipping_outlined),
+    'bicycle': ('Bicycle', Icons.pedal_bike),
+    'other': ('Other', Icons.more_horiz),
+    'unknown': ('Unknown type', Icons.help_outline),
+  };
+
+  Widget _vehicleTile(String type) {
+    final (label, icon) = _vehicleInfo[type]!;
+    final count = _vehicles[type] ?? 0;
+    final active = count > 0;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+      decoration: BoxDecoration(
+        color: active
+            ? RoadSafeColors.orange.withValues(alpha: 0.10)
+            : RoadSafeColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: active ? RoadSafeColors.orange : RoadSafeColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: active ? RoadSafeColors.orange : RoadSafeColors.muted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                tooltip: 'Remove $type',
+                visualDensity: VisualDensity.compact,
+                onPressed: count == 0
+                    ? null
+                    : () => setState(() {
+                        if (count == 1) {
+                          _vehicles.remove(type);
+                        } else {
+                          _vehicles[type] = count - 1;
+                        }
+                      }),
+                icon: const Icon(Icons.remove_circle_outline),
+              ),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: active ? RoadSafeColors.orange : null,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Add $type',
+                visualDensity: VisualDensity.compact,
+                color: RoadSafeColors.orange,
+                onPressed: count >= 999
+                    ? null
+                    : () => setState(() => _vehicles[type] = count + 1),
+                icon: const Icon(Icons.add_circle_outline),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _label(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
