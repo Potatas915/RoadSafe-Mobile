@@ -30,7 +30,11 @@ ThemeData buildRoadSafeTheme() {
       foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

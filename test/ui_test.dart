@@ -1,10 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:roadsafe_mobile/backend/backend.dart';
 import 'package:roadsafe_mobile/main.dart';
+import 'package:roadsafe_mobile/screens/home_screen.dart';
 import 'package:roadsafe_mobile/screens/report_screen.dart';
 import 'package:roadsafe_mobile/theme/roadsafe_theme.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+
+class _SignedInBackend extends RoadSafeBackend {
+  @override
+  bool get signedIn => true;
+  @override
+  String? get userId => 'resident';
+  @override
+  String? get username => 'juan';
+  @override
+  Future<void> signOut() async {}
+}
+
+Widget _landing({bool signedIn = true}) => MaterialApp(
+  theme: buildRoadSafeTheme(),
+  home: HomeScreen(backend: signedIn ? _SignedInBackend() : RoadSafeBackend()),
+);
 
 Future<void> enterDetails(WidgetTester tester) async {
   await tester.ensureVisible(find.text('Collision'));
@@ -115,10 +133,10 @@ void main() {
     (tester) async {
       await pumpReportWithTestMap(tester);
       await tester.tap(find.text('Collision'));
-      await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Known types and counts').last);
+      await tester.ensureVisible(
+        find.byKey(const Key('vehicle-status-known')),
+      );
+      await tester.tap(find.byKey(const Key('vehicle-status-known')));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('description')));
       await tester.enterText(
@@ -150,29 +168,56 @@ void main() {
     },
   );
 
-  testWidgets('Home opens reporting and provides a way back', (tester) async {
+  testWidgets('Guests create an account or sign in before reporting', (
+    tester,
+  ) async {
     await tester.pumpWidget(const RoadSafeApp());
-    expect(find.text('A little action.\nA safer community.'), findsOneWidget);
-    expect(find.text('Report an Accident'), findsOneWidget);
-    expect(find.text('Report an accident'), findsNothing);
+    expect(find.text("GET STARTED"), findsOneWidget);
+    expect(find.text('Resident Login'), findsOneWidget);
+    expect(find.text('Enforcer Login'), findsOneWidget);
+    expect(find.text('Sign Up'), findsOneWidget);
+    expect(find.text('Report an Incident'), findsNothing);
+    expect(find.byKey(const Key('report-accident')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('sign-up')));
+    await tester.tap(find.byKey(const Key('sign-up')));
+    await tester.pumpAndSettle();
+    expect(find.text('Create your account'), findsOneWidget);
+    await tester.tap(find.text('Already have an account? Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Create your account'), findsNothing);
+  });
+
+  testWidgets('Home opens reporting and provides a way back', (tester) async {
+    await tester.pumpWidget(_landing());
+    expect(find.text('Report an Incident'), findsOneWidget);
+    expect(find.text('juan'), findsOneWidget);
+    expect(find.text('My reports'), findsOneWidget);
+    expect(find.text('Sign Up'), findsNothing);
     expect(find.byType(TextFormField), findsNothing);
-    await tester.ensureVisible(find.text('Report updates will appear here'));
-    expect(find.text('Report updates will appear here'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('my-reports')));
+    await tester.tap(find.byKey(const Key('my-reports')));
+    await tester.pumpAndSettle();
+    expect(find.text('Reports'), findsOneWidget);
+    expect(find.text('Updates'), findsOneWidget);
+    expect(find.text('Sign out'), findsNothing);
+    await tester.tap(find.byKey(const Key('back')));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('report-accident')));
     await tester.tap(find.byKey(const Key('report-accident')));
     await tester.pumpAndSettle();
-    expect(find.text('Report an accident'), findsOneWidget);
+    expect(find.text('Report an incident'), findsOneWidget);
     await tester.tap(find.byTooltip('Return home'));
     await tester.pumpAndSettle();
-    expect(find.text('Report an Accident'), findsOneWidget);
+    expect(find.text('Report an Incident'), findsOneWidget);
     expect(find.byType(TextFormField), findsNothing);
   });
   testWidgets('Public app only exposes accident reporting', (tester) async {
-    await tester.pumpWidget(const RoadSafeApp());
+    await tester.pumpWidget(_landing());
     await tester.ensureVisible(find.byKey(const Key('report-accident')));
     await tester.tap(find.byKey(const Key('report-accident')));
     await tester.pumpAndSettle();
-    expect(find.text('Report an accident'), findsOneWidget);
+    expect(find.text('Report an incident'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.text('GIS Tactical Map'), findsNothing);
     expect(find.text('Police Stations'), findsNothing);
