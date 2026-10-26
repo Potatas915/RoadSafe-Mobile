@@ -6,6 +6,12 @@ import 'package:roadsafe_mobile/screens/enforcer_screen.dart';
 
 class FixtureBackend extends RoadSafeBackend {
   int version = 3;
+  bool signedOut = false;
+  @override
+  Future<void> signOut() async {
+    signedOut = true;
+  }
+
   @override
   String get userId => 'officer';
   @override
@@ -40,6 +46,13 @@ class FixtureApi extends EnforcerBackend {
   final writes = <Map<String, dynamic>>[];
   String? station;
   bool onDuty = false;
+  int heartbeats = 0;
+  bool transferBeforeWrite = false;
+  @override
+  Future<void> heartbeat() async {
+    heartbeats++;
+  }
+
   @override
   Future<Map<String, dynamic>?> medicalRecommendation(String reportId) async =>
       {
@@ -67,11 +80,21 @@ class FixtureApi extends EnforcerBackend {
     ],
   };
   @override
-  Future<void> duty(String nextStation, bool nextDuty) async {
+  Future<void> duty(
+    String nextStation,
+    bool nextDuty, {
+    required String? expectedStationId,
+  }) async {
+    if (transferBeforeWrite) {
+      station = 'way/2';
+      onDuty = false;
+    }
+    if (expectedStationId != station) throw StateError('Stale station');
     station = nextStation;
     onDuty = nextDuty;
     writes.add({
-      'rpc': 'set_enforcer_duty',
+      'rpc': 'set_enforcer_duty_checked',
+      'p_expected_station_id': expectedStationId,
       'p_station': station,
       'p_on_duty': onDuty,
     });
@@ -94,6 +117,79 @@ class FixtureApi extends EnforcerBackend {
 }
 
 void main() {
+  testWidgets(
+    'sign out cannot restore a station transferred before its off duty write',
+    (tester) async {
+      final backend = FixtureBackend();
+      final service = FixtureApi(backend)
+        ..station = 'node/1'
+        ..onDuty = true
+        ..transferBeforeWrite = true;
+      addTearDown(backend.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EnforcerScreen(backend: backend, service: service),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Sign out'));
+      await tester.pumpAndSettle();
+      expect(backend.signedOut, isTrue);
+      expect(service.station, 'way/2');
+      expect(service.onDuty, isFalse);
+      expect(service.writes, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'refresh keeps an admin transfer off duty without replaying writes',
+    (tester) async {
+      final backend = FixtureBackend();
+      final service = FixtureApi(backend)
+        ..station = 'node/1'
+        ..onDuty = true;
+      addTearDown(backend.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EnforcerScreen(backend: backend, service: service),
+        ),
+      );
+      await tester.pumpAndSettle();
+      service.station = 'way/2';
+      service.onDuty = false;
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(find.text('Station Two'), findsWidgets);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      expect(service.writes, isEmpty);
+      expect(service.heartbeats, 2);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'a transfer racing duty activation refreshes server state without retry',
+    (tester) async {
+      final backend = FixtureBackend();
+      final service = FixtureApi(backend)
+        ..station = 'node/1'
+        ..transferBeforeWrite = true;
+      addTearDown(backend.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EnforcerScreen(backend: backend, service: service),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(find.text('Station Two'), findsWidgets);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      expect(service.station, 'way/2');
+      expect(service.writes, isEmpty);
+      expect(find.textContaining('Could not save duty'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
   testWidgets(
     'narrow phone selects a station, goes on duty and saves a versioned response',
     (tester) async {
@@ -131,7 +227,7 @@ void main() {
       expect(
         writes.any(
           (w) =>
-              w['rpc'] == 'set_enforcer_duty' &&
+              w['rpc'] == 'set_enforcer_duty_checked' &&
               w['p_station'] == 'way/2' &&
               w['p_on_duty'] == true,
         ),

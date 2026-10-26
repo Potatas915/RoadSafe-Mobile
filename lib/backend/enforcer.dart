@@ -38,9 +38,18 @@ class EnforcerBackend {
   Future<Map<String, dynamic>> context() async => Map<String, dynamic>.from(
     await backend.client.rpc('get_enforcer_context'),
   );
-  Future<void> duty(String station, bool onDuty) => backend.client.rpc(
-    'set_enforcer_duty',
-    params: {'p_station': station, 'p_on_duty': onDuty},
+  Future<void> heartbeat() => backend.client.rpc('heartbeat_enforcer');
+  Future<void> duty(
+    String station,
+    bool onDuty, {
+    required String? expectedStationId,
+  }) => backend.client.rpc(
+    'set_enforcer_duty_checked',
+    params: {
+      'p_station': station,
+      'p_on_duty': onDuty,
+      'p_expected_station_id': expectedStationId,
+    },
   );
   Future<void> update(
     Map<String, dynamic> report,

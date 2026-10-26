@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../widgets/evidence_section.dart';
 import 'username.dart';
 import 'categories.dart';
+import 'reporter_validation.dart';
 
 Map<String, dynamic> buildSubmissionParams({
   required String submissionId,
@@ -51,8 +52,8 @@ class RoadSafeBackend extends ChangeNotifier {
   String? get userId => _client?.auth.currentUser?.id;
   String? get username {
     final user = _client?.auth.currentUser;
-    return user?.userMetadata?['username'] as String? ??
-        user?.userMetadata?['name'] as String? ??
+    return user?.userMetadata?['name'] as String? ??
+        user?.userMetadata?['username'] as String? ??
         user?.email?.split('@').first;
   }
 
@@ -95,17 +96,28 @@ class RoadSafeBackend extends ChangeNotifier {
     await client.auth.signInWithPassword(email: identity, password: password);
   }
 
-  Future<bool> signUp(String username, String password, {String accountType = 'Public'}) async {
-    final canonical = normalizeUsername(username);
-    if (!validUsername(canonical)) {
-      throw const AuthException(
-        'Use 3–24 letters, numbers or underscores; start with a letter.',
-      );
-    }
+  Future<bool> signUp(
+    String email,
+    String password, {
+    required String fullName,
+    String accountType = 'Public',
+    String? stationId,
+  }) async {
+    final canonical = email.trim().toLowerCase();
+    final name = fullName.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final nameError = validateReporterName(name);
+    if (nameError != null) throw AuthException(nameError);
+    if (!validAccountEmail(canonical)) throw const AuthException('Enter a valid email address.');
     try {
       await client.functions.invoke(
         'register-username',
-        body: {'username': canonical, 'password': password, 'accountType': accountType},
+        body: {
+          'email': canonical,
+          'fullName': name,
+          'password': password,
+          'accountType': accountType,
+          if (accountType == 'Officer') 'stationId': stationId,
+        },
       );
     } on FunctionException catch (error) {
       final details = error.details;

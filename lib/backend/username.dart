@@ -1,5 +1,12 @@
 String normalizeUsername(String value) => value.trim().toLowerCase();
 
+bool validAccountEmail(String value) {
+  final email = value.trim().toLowerCase();
+  return email.length <= 254 &&
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email) &&
+      !email.endsWith('@roadsafe.local');
+}
+
 bool validUsername(String value) =>
     RegExp(r'^[a-z][a-z0-9_]{2,23}$').hasMatch(normalizeUsername(value));
 

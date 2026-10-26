@@ -25,7 +25,7 @@ Public Supabase configuration defaults to the connected development project. Ove
 
 Android foreground location/internet permissions are configured. Camera/gallery uses image_picker and Android system pickers. There is no iOS runner in this workspace; a future iOS runner needs location, camera, and photo-library usage descriptions. Native camera/map/GPS behavior still requires device testing. An internet connection is needed for map tiles, authentication, submissions, and updates.
 
-Registration now asks only for username and password, with immediate sign-in and no confirmation email. Usernames are case-insensitive and must start with a letter, using 3–24 letters, numbers, or underscores. Existing email-based accounts can still use their original email in the Username sign-in field. Supabase Auth remains responsible for password hashing and sessions; the server creates internal identities without sending email.
+New registration collects full name, email and password. The name is saved on the profile; email is the sign-in identity. Existing username accounts still sign in through Email or username using their original credentials. The server retains the legacy username registration contract for older clients. Supabase Auth handles password hashing and sessions; the existing immediate-sign-in/no-confirmation-email policy is retained, so the supplied email is not verified by this flow. Enforcer applicants remain Public until Admin approval.
 
 ## R07 reporter policy
 
@@ -33,6 +33,8 @@ New reports require full name and contact number (1–120 trimmed characters eac
 
 ## Traffic enforcer response
 
-Use Traffic enforcer sign in with an existing active police Officer account managed by an Admin. Retained Officer sessions open the enforcer workspace; Public sessions retain public reporting/history. Admins must first open a police station on the web map to publish the loaded shared directory. Search/select a station, go On duty, and keep the app active to appear available in its station roster (30-second heartbeat; offline after 90 seconds). The affiliation is self-selected, not GPS presence.
+Choose Traffic enforcer during account creation and search the shared Philippine police-station directory by name or address. The selected station is saved with the account; Admin approval is still required for police Officer access. Enforcer sign-in uses the saved station and activates duty without asking for a station again. Older accounts without a saved station can choose one in the enforcer workspace after login. Retained Officer sessions open that workspace; Public sessions retain public reporting/history. Keep the app active to appear online (30-second heartbeat; offline after 90 seconds). The directory is cached OpenStreetMap geography and is not guaranteed to include every Philippine station; later updates are shared from the Admin map. Affiliation is self-selected, not GPS presence.
+
+This flow requires migration `20261026090000_enforcer_registration_station.sql` and the updated `register-username` Edge Function. Registration requires a current directory station for new enforcer applications; older mobile clients must update before creating an enforcer account.
 
 Admins assign a selected verified Existing report through its police-station card. My cases offers incident details, a read-only scene map, evidence and versioned progress/official remarks; Verify offers only eligible unassigned cases. Findings/actions use the existing remarks/history rather than new statuses or structured fields. Scene map tiles need internet. The development migration is `20261020090000_enforcer_stations.sql`; apply all migrations on other environments before using this feature. No background push or external emergency dispatch is implied.

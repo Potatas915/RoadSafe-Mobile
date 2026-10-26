@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'backend.dart';
 import 'username.dart';
+import 'reporter_validation.dart';
 import '../theme/roadsafe_theme.dart';
 import '../widgets/roadsafe_logo.dart';
+import '../widgets/station_search.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({
@@ -29,6 +31,7 @@ class _AccountScreenState extends State<AccountScreen> {
   final _form = GlobalKey<FormState>();
 
   final _username = TextEditingController();
+  final _fullName = TextEditingController();
   final _password = TextEditingController();
   bool get _register => widget.registration;
   String _accountType = 'Public';
@@ -39,7 +42,7 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _accountType = widget.enforcer ? 'Officer' : 'Public';
-    if (widget.enforcer && !_register) {
+    if (widget.enforcer && _register) {
       _loadStations();
     }
   }
@@ -64,7 +67,8 @@ class _AccountScreenState extends State<AccountScreen> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _message = 'Could not load stations. Retry before signing in.',
+          () =>
+              _message = 'Could not load stations. Refresh stations to retry.',
         );
       }
     } finally {
@@ -81,6 +85,7 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void dispose() {
     _username.dispose();
+    _fullName.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -97,7 +102,9 @@ class _AccountScreenState extends State<AccountScreen> {
         final signedIn = await backend.signUp(
           _username.text,
           _password.text,
+          fullName: _fullName.text,
           accountType: _accountType,
+          stationId: _accountType == 'Officer' ? _station : null,
         );
         if (!mounted) return;
         if (_accountType == 'Officer') {
@@ -114,8 +121,7 @@ class _AccountScreenState extends State<AccountScreen> {
         if (!signedIn) {
           setState(() {
             _messageOk = true;
-            _message =
-                'Account created. Switch to Sign in and use your username and password.';
+            _message = 'Account created. Sign in with your email and password.';
           });
           return;
         }
@@ -124,11 +130,18 @@ class _AccountScreenState extends State<AccountScreen> {
       }
       if (widget.enforcer && !_register) {
         try {
-          await backend.client.rpc('get_enforcer_context');
-          await backend.client.rpc(
-            'set_enforcer_duty',
-            params: {'p_station': _station, 'p_on_duty': true},
-          );
+          final context = await backend.client.rpc('get_enforcer_context');
+          final savedStation = (context as Map)['stationId'] as String?;
+          if (savedStation != null) {
+            await backend.client.rpc(
+              'set_enforcer_duty_checked',
+              params: {
+                'p_station': savedStation,
+                'p_on_duty': true,
+                'p_expected_station_id': savedStation,
+              },
+            );
+          }
         } catch (_) {
           await backend.signOut();
           throw const AuthException(
@@ -162,7 +175,7 @@ class _AccountScreenState extends State<AccountScreen> {
   String get _subtitle => _register
       ? 'Pick the account that fits you. Traffic enforcers need Admin verification before staff access is granted.'
       : widget.enforcer
-      ? 'Choose your station. Signing in puts you on duty and makes you available on its map roster when you have no active case.'
+      ? 'Sign in with your saved station. You appear on its roster when on duty and free of active cases. If you have no saved station yet, choose one after signing in.'
       : 'Your account keeps your reports and updates together. Your report draft stays here while you sign in.';
 
   @override
@@ -212,7 +225,11 @@ class _AccountScreenState extends State<AccountScreen> {
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.badge_outlined, size: 14, color: RoadSafeColors.orange),
+              Icon(
+                Icons.badge_outlined,
+                size: 14,
+                color: RoadSafeColors.orange,
+              ),
               SizedBox(width: 6),
               Text(
                 'TRAFFIC ENFORCER',
@@ -284,30 +301,51 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           const SizedBox(height: 20),
         ],
-        if (widget.enforcer && !_register) ...[
-          DropdownButtonFormField<String>(
+        if (_register && _accountType == 'Officer') ...[
+          FormField<String>(
             initialValue: _station,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Station',
-              prefixIcon: Icon(Icons.place_outlined),
-            ),
-            items: _stations
-                .map(
-                  (s) => DropdownMenuItem(
-                    value: s['id'] as String,
-                    child: Text(
-                      '${s['name']} — ${s['address']}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: _busy || _loadingStations
-                ? null
-                : (value) => setState(() => _station = value),
+            key: ValueKey(_station),
             validator: (value) =>
                 value == null ? 'Choose your stationed location' : null,
+            builder: (field) {
+              final selected = _stations
+                  .where((s) => s['id'] == _station)
+                  .firstOrNull;
+              return InkWell(
+                key: const Key('registration-station-picker'),
+                onTap: _busy || _loadingStations || _stations.isEmpty
+                    ? null
+                    : () async {
+                        final selected = await showSearch<String?>(
+                          context: context,
+                          delegate: StationSearch(_stations),
+                        );
+                        if (!mounted || selected == null) return;
+                        field.didChange(selected);
+                        setState(() => _station = selected);
+                      },
+                child: InputDecorator(
+                  isEmpty: selected == null,
+                  decoration: InputDecoration(
+                    labelText: 'Station',
+                    prefixIcon: const Icon(Icons.place_outlined),
+                    suffixIcon: const Icon(Icons.search),
+                    errorText: field.errorText,
+                    helperText: 'Search Philippine stations by name or address',
+                    helperMaxLines: 2,
+                    enabled:
+                        !_busy && !_loadingStations && _stations.isNotEmpty,
+                  ),
+                  child: Text(
+                    selected == null
+                        ? ''
+                        : '${selected['name']} — ${selected['address']}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              );
+            },
           ),
           if (_loadingStations)
             const Padding(
@@ -336,25 +374,44 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
           const SizedBox(height: 8),
         ],
+        if (_register) ...[
+          TextFormField(
+            controller: _fullName,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.name],
+            decoration: const InputDecoration(
+              labelText: 'Full name',
+              hintText: 'First name and last name',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+            validator: validateReporterName,
+          ),
+          const SizedBox(height: 16),
+        ],
         TextFormField(
           controller: _username,
-          keyboardType: TextInputType.text,
+          keyboardType: _register
+              ? TextInputType.emailAddress
+              : TextInputType.text,
           textInputAction: TextInputAction.next,
           autocorrect: false,
           enableSuggestions: false,
-          autofillHints: const [AutofillHints.username],
+          autofillHints: _register
+              ? const [AutofillHints.email]
+              : const [AutofillHints.username],
           decoration: InputDecoration(
-            labelText: 'Username',
-            prefixIcon: const Icon(Icons.person_outline),
-            helperText: _register
-                ? '3–24 letters, numbers or underscores. Start with a letter.'
-                : null,
+            labelText: _register ? 'Email' : 'Email or username',
+            prefixIcon: const Icon(Icons.alternate_email),
+            helperText: _register ? 'Use this email to sign in.' : null,
             helperMaxLines: 2,
           ),
           validator: (v) => v == null || v.trim().isEmpty
-              ? 'Enter your username'
-              : _register && !validUsername(v)
-              ? 'Choose a valid username'
+              ? (_register
+                    ? 'Enter your email'
+                    : 'Enter your email or username')
+              : _register && !validAccountEmail(v)
+              ? 'Enter a valid email address'
               : null,
         ),
         const SizedBox(height: 16),
@@ -432,7 +489,16 @@ class _AccountScreenState extends State<AccountScreen> {
         child: InkWell(
           key: Key('account-type-$type'),
           borderRadius: BorderRadius.circular(16),
-          onTap: _busy ? null : () => setState(() => _accountType = type),
+          onTap: _busy
+              ? null
+              : () {
+                  setState(() => _accountType = type);
+                  if (type == 'Officer' &&
+                      _stations.isEmpty &&
+                      !_loadingStations) {
+                    _loadStations();
+                  }
+                },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.all(14),
@@ -541,7 +607,9 @@ class _AccountScreenState extends State<AccountScreen> {
             }
           },
     child: Text(
-      _register ? 'Already have an account? Sign in' : 'New here? Create an account',
+      _register
+          ? 'Already have an account? Sign in'
+          : 'New here? Create an account',
     ),
   );
 }

@@ -164,6 +164,8 @@ class _PreviewApi extends EnforcerBackend {
   String? station = 'node/1';
   bool onDuty = true;
   @override
+  Future<void> heartbeat() async {}
+  @override
   Future<Map<String, dynamic>> context() async => {
     'name': 'Officer Dela Cruz',
     'stationId': station,
@@ -187,7 +189,12 @@ class _PreviewApi extends EnforcerBackend {
     ],
   };
   @override
-  Future<void> duty(String nextStation, bool nextDuty) async {
+  Future<void> duty(
+    String nextStation,
+    bool nextDuty, {
+    required String? expectedStationId,
+  }) async {
+    if (station != expectedStationId) throw StateError('Stale station');
     station = nextStation;
     onDuty = nextDuty;
   }

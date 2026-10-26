@@ -8,6 +8,46 @@ import 'package:roadsafe_mobile/backend/backend.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
+    'Registration sends normalized full name and email and signs in by email',
+    () async {
+      Map<String, dynamic>? payload;
+      final client = SupabaseClient(
+        'https://fixture.supabase.co',
+        'fixture',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/functions/v1/register-username');
+          payload = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            '{}',
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final backend = RegistrationCaptureBackend(client: client);
+      addTearDown(client.dispose);
+      expect(
+        await backend.signUp(
+          ' MARIA@EXAMPLE.COM ',
+          'fixture-password',
+          fullName: ' Maria   Santos ',
+          accountType: 'Officer',
+          stationId: 'way/2',
+        ),
+        isTrue,
+      );
+      expect(payload, {
+        'email': 'maria@example.com',
+        'fullName': 'Maria Santos',
+        'password': 'fixture-password',
+        'accountType': 'Officer',
+        'stationId': 'way/2',
+      });
+      expect(backend.loginEmail, 'maria@example.com');
+    },
+  );
+  test(
     'Structured submission preserves vehicle types and known casualty counts',
     () {
       final params = buildSubmissionParams(
@@ -166,4 +206,13 @@ void main() {
       expect(calls[0]['p_submission_id'], calls[1]['p_submission_id']);
     },
   );
+}
+
+class RegistrationCaptureBackend extends RoadSafeBackend {
+  RegistrationCaptureBackend({super.client});
+  String? loginEmail;
+  @override
+  Future<void> signIn(String username, String password) async {
+    loginEmail = username;
+  }
 }

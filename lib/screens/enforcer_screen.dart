@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../widgets/station_search.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../backend/backend.dart';
@@ -206,10 +207,10 @@ class _EnforcerScreenState extends State<EnforcerScreen>
     final current = ++generation;
     busy = true;
     try {
+      await api.heartbeat();
       final context = await api.context();
       final selected = context['stationId'] as String?;
       final duty = context['onDuty'] == true;
-      if (selected != null) await api.duty(selected, duty);
       final feed = await backend.reports(ownOnly: false);
       if (!mounted || current != generation) return;
       setState(() {
@@ -241,7 +242,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
       error = null;
     });
     try {
-      await api.duty(nextStation, nextDuty);
+      await api.duty(nextStation, nextDuty, expectedStationId: station);
       if (mounted) {
         setState(() {
           station = nextStation;
@@ -249,10 +250,29 @@ class _EnforcerScreenState extends State<EnforcerScreen>
         });
       }
     } catch (_) {
+      // A transfer may have invalidated this write; never retry its old station.
+      try {
+        final context = await api.context();
+        if (mounted) {
+          setState(() {
+            profile = context;
+            station = context['stationId'] as String?;
+            onDuty = context['onDuty'] == true;
+            reports = [];
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            profile = null;
+            reports = [];
+          });
+        }
+      }
       if (mounted) {
         setState(
           () => error =
-              'Could not save duty. Finish active cases before changing station, then refresh and retry.',
+              'Could not save duty. Your station may have changed or active cases may prevent this change. Refresh and retry.',
         );
       }
     } finally {
@@ -271,7 +291,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
   Future<void> _pickStation(List stations) async {
     final selected = await showSearch<String?>(
       context: context,
-      delegate: _StationSearch(stations),
+      delegate: StationSearch(stations),
     );
     if (selected != null) {
       await setDuty(selected, onDuty);
@@ -281,7 +301,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
   Future<void> _signOut() async {
     if (station != null) {
       try {
-        await api.duty(station!, false);
+        await api.duty(station!, false, expectedStationId: station);
       } catch (_) {
         /* Expiry still removes online presence. */
       }
@@ -722,69 +742,6 @@ class _EnforcerScreenState extends State<EnforcerScreen>
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StationSearch extends SearchDelegate<String?> {
-  _StationSearch(this.stations);
-  final List stations;
-  @override
-  String get searchFieldLabel => 'Search police stations';
-  @override
-  List<Widget> buildActions(BuildContext context) => [
-    IconButton(onPressed: () => query = '', icon: const Icon(Icons.clear)),
-  ];
-  @override
-  Widget buildLeading(BuildContext context) => IconButton(
-    onPressed: () => close(context, null),
-    icon: const Icon(Icons.arrow_back),
-  );
-  @override
-  Widget buildResults(BuildContext context) => buildSuggestions(context);
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    final matches = stations
-        .where(
-          (s) => '${s['name']} ${s['address']}'.toLowerCase().contains(
-            query.toLowerCase(),
-          ),
-        )
-        .toList();
-    if (matches.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'No stations match your search.',
-            style: TextStyle(color: RoadSafeColors.muted),
-          ),
-        ),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: matches.length,
-      separatorBuilder: (_, _) =>
-          const Divider(height: 1, color: RoadSafeColors.border),
-      itemBuilder: (context, index) {
-        final station = matches[index];
-        return ListTile(
-          leading: const Icon(
-            Icons.local_police_outlined,
-            color: RoadSafeColors.orange,
-          ),
-          title: Text(
-            station['name'] as String,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          subtitle: Text(
-            '${station['address'] ?? ''}',
-            style: const TextStyle(color: RoadSafeColors.muted, fontSize: 12),
-          ),
-          onTap: () => close(context, station['id'] as String),
-        );
-      },
     );
   }
 }

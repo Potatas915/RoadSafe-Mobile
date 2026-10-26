@@ -17,18 +17,18 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Registration asks only for username and password with no email confirmation',
-    (tester) async {
-      await tester.pumpWidget(const MaterialApp(home: AccountScreen()));
-      await tester.tap(find.text('New here? Create an account'));
-      await tester.pump();
-      expect(find.text('Username'), findsOneWidget);
-      expect(find.text('Password'), findsOneWidget);
-      expect(find.byType(TextFormField), findsNWidgets(2));
-      expect(find.text('Name'), findsNothing);
-      expect(find.text('Email'), findsNothing);
-      expect(find.textContaining('confirm your account'), findsNothing);
-    },
-  );
+  testWidgets('Registration asks for full name, email and password', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: AccountScreen(registration: true)),
+    );
+    await tester.pump();
+    expect(find.text('Full name'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(3));
+    expect(find.text('Username'), findsNothing);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.textContaining('confirm your account'), findsNothing);
+  });
 }
