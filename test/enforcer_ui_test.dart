@@ -119,6 +119,19 @@ class FixtureApi extends EnforcerBackend {
 }
 
 void main() {
+  testWidgets('mobile enforcer only sees assigned active cases and has no Verify tab', (tester) async {
+    final backend = AssignedOnlyFixture();
+    addTearDown(backend.dispose);
+    await tester.pumpWidget(MaterialApp(home: EnforcerScreen(backend: backend, service: FixtureApi(backend))));
+    await tester.pumpAndSettle();
+    expect(find.text('Verify'), findsNothing);
+    expect(find.text('My cases'), findsOneWidget);
+    expect(find.text('Collision case'), findsOneWidget);
+    expect(find.text('Unassigned accident'), findsNothing);
+    expect(find.text('Other officer accident'), findsNothing);
+    expect(find.text('Closed accident'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('case list preserves the full report UUID and its casing', (
     tester,
   ) async {
@@ -287,4 +300,16 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+}
+
+class AssignedOnlyFixture extends FixtureBackend {
+  @override
+  Future<List<Map<String, dynamic>>> reports({bool ownOnly = true}) async {
+    final own = (await super.reports()).single;
+    return [own,
+      {...own, 'id': 'unassigned', 'categoryLabel': 'Unassigned accident', 'status': 'Submitted', 'assignedOfficerId': null},
+      {...own, 'id': 'other', 'categoryLabel': 'Other officer accident', 'assignedOfficerId': 'someone-else'},
+      {...own, 'id': 'closed', 'categoryLabel': 'Closed accident', 'status': 'Resolved / Closed'},
+    ];
+  }
 }

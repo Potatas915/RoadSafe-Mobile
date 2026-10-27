@@ -181,7 +181,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
   List<Map<String, dynamic>> reports = [];
   String? station;
   String? error;
-  bool onDuty = false, busy = false, foreground = true, verification = false;
+  bool onDuty = false, busy = false, foreground = true;
   int generation = 0;
   @override
   void initState() {
@@ -308,8 +308,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
   Widget build(BuildContext context) {
     final uid = backend.userId;
     final mine = reports.where((r) => isOwnActiveCase(r, uid)).toList();
-    final toVerify = reports.where((r) => canVerifyCase(r, uid)).toList();
-    final cases = verification ? toVerify : mine;
+    final cases = mine;
     final stations = profile?['stations'] as List? ?? [];
     final stationName =
         stations.where((s) => s['id'] == station).firstOrNull?['name']
@@ -383,7 +382,13 @@ class _EnforcerScreenState extends State<EnforcerScreen>
                 _errorColor,
                 Text(error!, style: const TextStyle(fontSize: 12.5, height: 1.5)),
               ),
-            _tabs(mine.length, toVerify.length),
+            Row(
+              children: [
+                const Text('My cases', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                const SizedBox(width: 8),
+                Text('${mine.length}', style: const TextStyle(color: RoadSafeColors.orange, fontWeight: FontWeight.w700)),
+              ],
+            ),
             const SizedBox(height: 14),
             if (!busy && profile != null && cases.isEmpty) _empty(),
             ...cases.map(_caseCard),
@@ -527,101 +532,25 @@ class _EnforcerScreenState extends State<EnforcerScreen>
     );
   }
 
-  Widget _tabs(int mineCount, int verifyCount) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(
-      color: RoadSafeColors.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: RoadSafeColors.border),
-    ),
-    child: Row(
-      children: [
-        _tab('My cases', Icons.assignment_outlined, mineCount, false),
-        _tab('Verify', Icons.fact_check_outlined, verifyCount, true),
-      ],
-    ),
-  );
-
-  Widget _tab(String label, IconData icon, int count, bool value) {
-    final selected = verification == value;
-    final fg = selected ? Colors.white : RoadSafeColors.muted;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => verification = value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          decoration: BoxDecoration(
-            color: selected ? RoadSafeColors.orange : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: fg),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
-                ),
-              ),
-              if (count > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? Colors.white.withValues(alpha: 0.25)
-                        : RoadSafeColors.orange.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: selected ? Colors.white : RoadSafeColors.orange,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _empty() => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 12),
+  Widget _empty() => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 36, horizontal: 12),
     child: Column(
       children: [
         Icon(
-          verification
-              ? Icons.fact_check_outlined
-              : Icons.assignment_turned_in_outlined,
+          Icons.assignment_turned_in_outlined,
           size: 40,
           color: RoadSafeColors.muted,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         Text(
-          verification ? 'Nothing to verify' : 'No cases here',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          'No cases here',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(
-          verification
-              ? 'New public reports you can verify will appear here. Pull down to refresh.'
-              : 'When an Admin assigns you a report, it will appear here. Pull down to refresh.',
+          'When an Admin assigns you a report, it will appear here. Pull down to refresh.',
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: RoadSafeColors.muted,
             fontSize: 12.5,
             height: 1.5,
