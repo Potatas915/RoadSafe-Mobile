@@ -1,7 +1,7 @@
 import 'dart:async';
 import '../widgets/station_search.dart';
 import 'package:flutter/material.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'scene_map.dart';
 import '../backend/backend.dart';
 import '../backend/enforcer.dart';
 import '../theme/roadsafe_theme.dart';
@@ -579,6 +579,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
                     MaterialPageRoute<void>(
                       builder: (_) => _CaseScreen(
                         report: report,
+                        station: (profile?['stations'] as List? ?? []).where((row) => row['id'] == station).firstOrNull,
                         backend: backend,
                         service: api,
                       ),
@@ -673,10 +674,12 @@ class _EnforcerScreenState extends State<EnforcerScreen>
 class _CaseScreen extends StatefulWidget {
   const _CaseScreen({
     required this.report,
+    this.station,
     required this.backend,
     required this.service,
   });
   final Map<String, dynamic> report;
+  final Map? station;
   final RoadSafeBackend backend;
   final EnforcerBackend service;
   @override
@@ -993,7 +996,8 @@ class _CaseScreenState extends State<_CaseScreen> {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute<void>(
-                        builder: (_) => _SceneMap(
+                        builder: (_) => SceneMap(
+                          station: widget.station,
                           latitude: (coords['latitude'] as num).toDouble(),
                           longitude: (coords['longitude'] as num).toDouble(),
                         ),
@@ -1081,7 +1085,7 @@ class _CaseScreenState extends State<_CaseScreen> {
               onMap: (lat, lng, name) => Navigator.push(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) => _SceneMap(
+                  builder: (_) => SceneMap(
                     latitude: lat,
                     longitude: lng,
                     title: name,
@@ -1378,64 +1382,6 @@ class MedicalRecommendationDetails extends StatelessWidget {
             color: RoadSafeColors.muted,
             fontSize: 11.5,
             height: 1.5,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _SceneMap extends StatelessWidget {
-  const _SceneMap({
-    required this.latitude,
-    required this.longitude,
-    this.title = 'Accident location',
-    this.facility = false,
-  });
-  final double latitude, longitude;
-  final String title;
-  final bool facility;
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title)),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: _banner(
-            facility ? Icons.local_hospital_outlined : Icons.place_outlined,
-            RoadSafeColors.orange,
-            SelectableText(
-              facility
-                  ? 'Mapped facility: $latitude, $longitude\nLocation information only. Capacity and acceptance are unconfirmed.'
-                  : 'Confirmed accident pin: $latitude, $longitude\nMap tiles require internet. This is the reported scene, not live enforcer tracking.',
-              style: const TextStyle(fontSize: 12.5, height: 1.5),
-            ),
-          ),
-        ),
-        Expanded(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              MapLibreMap(
-                initialCameraPosition: CameraPosition(
-                  target: LatLng(latitude, longitude),
-                  zoom: 15.5,
-                ),
-                styleString:
-                    'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
-                scrollGesturesEnabled: false,
-                rotateGesturesEnabled: false,
-                tiltGesturesEnabled: false,
-              ),
-              const IgnorePointer(
-                child: Icon(
-                  Icons.location_on,
-                  color: RoadSafeColors.orange,
-                  size: 44,
-                ),
-              ),
-            ],
           ),
         ),
       ],
