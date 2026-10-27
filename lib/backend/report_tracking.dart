@@ -10,14 +10,16 @@ const _errorColor = Color(0xFFF87171);
 /// "My reports": every report the resident sent, how far each has come, and
 /// updates from the team.
 class ReportTrackingScreen extends StatefulWidget {
-  const ReportTrackingScreen({super.key, this.reportId});
+  const ReportTrackingScreen({super.key, this.reportId, this.backend});
   final String? reportId;
+  final RoadSafeBackend? backend;
   @override
   State<ReportTrackingScreen> createState() => _ReportTrackingScreenState();
 }
 
 class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
-  final backend = RoadSafeBackend.instance;
+  late final backend = widget.backend ?? RoadSafeBackend.instance;
+  final _savingUpdates = <int>{};
   List<Map<String, dynamic>> _reports = [];
   List<Map<String, dynamic>> _updates = [];
   Timer? _timer;
@@ -643,6 +645,22 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
 
   // ───────────────────────── Updates tab ─────────────────────────
 
+  Future<void> _setUpdateRead(Map<String, dynamic> update, bool read) async {
+    final id = update['id'] as int;
+    if (_savingUpdates.contains(id)) return;
+    setState(() => _savingUpdates.add(id));
+    try {
+      await backend.setNotificationRead(id, read);
+      await _refresh();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not mark the update as ${read ? 'read' : 'unread'}. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _savingUpdates.remove(id));
+    }
+  }
+
   Widget _updatesTab() => RefreshIndicator(
     onRefresh: _refresh,
     child: ListView(
@@ -664,18 +682,7 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
               borderRadius: BorderRadius.circular(16),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: () async {
-                  try {
-                    await backend.markRead(update['id'] as int);
-                    await _refresh();
-                  } catch (_) {
-                    if (mounted) {
-                      setState(
-                        () => _error = 'Could not mark the update as read.',
-                      );
-                    }
-                  }
-                },
+                onTap: _savingUpdates.contains(update['id']) ? null : () => _setUpdateRead(update, true),
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -724,16 +731,15 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
                           ],
                         ),
                       ),
-                      if (unread)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8, top: 4),
-                          width: 9,
-                          height: 9,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: RoadSafeColors.orange,
-                          ),
+                      SizedBox(
+                        width: 104,
+                        child: TextButton(
+                          onPressed: _savingUpdates.contains(update['id'])
+                              ? null
+                              : () => _setUpdateRead(update, unread),
+                          child: Text(unread ? 'Mark as read' : 'Mark as unread', textAlign: TextAlign.center),
                         ),
+                      ),
                     ],
                   ),
                 ),

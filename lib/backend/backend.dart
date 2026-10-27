@@ -227,6 +227,9 @@ class RoadSafeBackend extends ChangeNotifier {
 
   Future<void> markRead(int id) =>
       client.rpc('mark_notification_read', params: {'p_id': id});
+  Future<void> setNotificationRead(int id, bool read) => client.rpc(
+    'set_notification_read', params: {'p_id': id, 'p_read': read},
+  );
   Future<void> clarify(String id, String message) => client.rpc(
     'respond_to_clarification',
     params: {'p_id': id, 'p_message': message},
