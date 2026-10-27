@@ -15,6 +15,7 @@ class AccountBackend extends RoadSafeBackend {
   String? requestedEmail;
   bool signedOut = false;
   int logins = 0;
+  int registrations = 0;
   @override
   bool get ready => true;
   @override
@@ -30,6 +31,7 @@ class AccountBackend extends RoadSafeBackend {
     String accountType = 'Public',
     String? stationId,
   }) async {
+    registrations++;
     requestedType = accountType;
     requestedName = fullName;
     requestedEmail = username;
@@ -191,6 +193,13 @@ void main() {
       expect(backend.requestedEmail, 'maria@example.com');
       expect(backend.signedOut, true);
       expect(find.textContaining('An Admin must verify'), findsOneWidget);
+      expect(find.text('Create account'), findsNothing);
+      await tester.ensureVisible(find.text('Sign in'));
+      await tester.tap(find.text('Sign in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enforcer sign in'), findsOneWidget);
+      expect(backend.registrations, 1);
+      expect(find.byKey(const Key('registration-station-picker')), findsNothing);
     },
   );
 }

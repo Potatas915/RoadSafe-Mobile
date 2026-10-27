@@ -35,11 +35,6 @@ String _when(Object? iso) {
   return '${_months[date.month - 1]} ${date.day}, ${date.year} · $hour:$minute $period';
 }
 
-String _shortRef(Object? id) {
-  final text = '$id';
-  return (text.length > 8 ? text.substring(0, 8) : text).toUpperCase();
-}
-
 Color _statusColor(String status) {
   switch (status) {
     case 'Assigned':
@@ -729,7 +724,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
                   children: [
                     _StatusChip(status),
                     Text(
-                      '${_when(report['occurredAt'])}  ·  #${_shortRef(report['id'])}',
+                      '${_when(report['occurredAt'])}  ·  #${report['id']}',
                       style: const TextStyle(
                         color: RoadSafeColors.muted,
                         fontSize: 11.5,

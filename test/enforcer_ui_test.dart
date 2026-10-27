@@ -4,6 +4,8 @@ import 'package:roadsafe_mobile/backend/backend.dart';
 import 'package:roadsafe_mobile/backend/enforcer.dart';
 import 'package:roadsafe_mobile/screens/enforcer_screen.dart';
 
+const fixtureReportId = 'c12e363d-c13c-43b3-870c-399b7ecadf1a';
+
 class FixtureBackend extends RoadSafeBackend {
   int version = 3;
   bool signedOut = false;
@@ -17,7 +19,7 @@ class FixtureBackend extends RoadSafeBackend {
   @override
   Future<List<Map<String, dynamic>>> reports({bool ownOnly = true}) async => [
     {
-      'id': 'case-1',
+      'id': fixtureReportId,
       'version': version,
       'categoryLabel': 'Collision case',
       'status': 'Assigned',
@@ -117,6 +119,19 @@ class FixtureApi extends EnforcerBackend {
 }
 
 void main() {
+  testWidgets('case list preserves the full report UUID and its casing', (
+    tester,
+  ) async {
+    final backend = FixtureBackend();
+    final service = FixtureApi(backend);
+    addTearDown(backend.dispose);
+    await tester.pumpWidget(
+      MaterialApp(home: EnforcerScreen(backend: backend, service: service)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining(fixtureReportId), findsWidgets);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets(
     'sign out cannot restore a station transferred before its off duty write',
     (tester) async {

@@ -81,6 +81,7 @@ class _AccountScreenState extends State<AccountScreen> {
   bool _busy = false;
   bool _showPassword = false;
   bool _messageOk = false;
+  bool _accountCreated = false;
   String? _message;
   @override
   void dispose() {
@@ -91,6 +92,11 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> _submit() async {
+    if (_busy) return;
+    if (_accountCreated) {
+      _openSignIn();
+      return;
+    }
     if (!_form.currentState!.validate()) return;
     setState(() {
       _busy = true;
@@ -107,6 +113,7 @@ class _AccountScreenState extends State<AccountScreen> {
           stationId: _accountType == 'Officer' ? _station : null,
         );
         if (!mounted) return;
+        setState(() => _accountCreated = true);
         if (_accountType == 'Officer') {
           if (signedIn) await backend.signOut();
           if (mounted) {
@@ -165,6 +172,19 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   static const _errorColor = Color(0xFFF87171);
+
+  void _openSignIn() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (_) => AccountScreen(
+          enforcer: _accountType == 'Officer',
+          direct: widget.direct,
+          backend: backend,
+        ),
+      ),
+    );
+  }
 
   String get _title => _register
       ? 'Create your account'
@@ -471,7 +491,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                   )
                 : Text(
-                    _register ? 'Create account' : 'Sign in',
+                    _register && !_accountCreated ? 'Create account' : 'Sign in',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
           ),
