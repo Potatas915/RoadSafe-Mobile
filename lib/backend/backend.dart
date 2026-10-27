@@ -100,6 +100,7 @@ class RoadSafeBackend extends ChangeNotifier {
     String email,
     String password, {
     required String fullName,
+    String? username,
     String accountType = 'Public',
     String? stationId,
   }) async {
@@ -108,12 +109,16 @@ class RoadSafeBackend extends ChangeNotifier {
     final nameError = validateReporterName(name);
     if (nameError != null) throw AuthException(nameError);
     if (!validAccountEmail(canonical)) throw const AuthException('Enter a valid email address.');
+    if (username != null && !validUsername(username)) {
+      throw const AuthException('Use 3–24 letters, numbers or underscores; start with a letter.');
+    }
     try {
       await client.functions.invoke(
         'register-username',
         body: {
           'email': canonical,
           'fullName': name,
+          if (username != null) 'username': normalizeUsername(username),
           'password': password,
           'accountType': accountType,
           if (accountType == 'Officer') 'stationId': stationId,
@@ -130,7 +135,7 @@ class RoadSafeBackend extends ChangeNotifier {
     // Registration has succeeded. A connection interruption during automatic
     // sign-in must not tell the user that the account was never created.
     try {
-      await signIn(canonical, password);
+      await signIn(username == null ? canonical : normalizeUsername(username), password);
       return true;
     } catch (_) {
       return false;

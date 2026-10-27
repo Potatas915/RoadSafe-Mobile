@@ -13,6 +13,7 @@ class AccountBackend extends RoadSafeBackend {
   String? requestedStation;
   String? requestedName;
   String? requestedEmail;
+  String? requestedUsername;
   bool signedOut = false;
   int logins = 0;
   int registrations = 0;
@@ -25,16 +26,18 @@ class AccountBackend extends RoadSafeBackend {
 
   @override
   Future<bool> signUp(
-    String username,
+    String email,
     String password, {
     required String fullName,
+    String? username,
     String accountType = 'Public',
     String? stationId,
   }) async {
     registrations++;
     requestedType = accountType;
     requestedName = fullName;
-    requestedEmail = username;
+    requestedEmail = email;
+    requestedUsername = username;
     requestedStation = stationId;
     return true;
   }
@@ -151,13 +154,14 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('account-type-Officer')));
       await tester.tap(find.byKey(const Key('account-type-Officer')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField).at(0), 'Maria Santos');
+      await tester.enterText(find.byType(TextFormField).at(0), 'maria_officer');
+      await tester.enterText(find.byType(TextFormField).at(1), 'Maria Santos');
       await tester.enterText(
-        find.byType(TextFormField).at(1),
+        find.byType(TextFormField).at(2),
         'maria@example.com',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(2),
+        find.byType(TextFormField).at(3),
         'fixture_password',
       );
       await tester.ensureVisible(find.text('Create account'));
@@ -191,6 +195,7 @@ void main() {
       expect(backend.requestedStation, 'way/2');
       expect(backend.requestedName, 'Maria Santos');
       expect(backend.requestedEmail, 'maria@example.com');
+      expect(backend.requestedUsername, 'maria_officer');
       expect(backend.signedOut, true);
       expect(find.textContaining('An Admin must verify'), findsOneWidget);
       expect(find.text('Create account'), findsNothing);

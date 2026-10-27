@@ -8,7 +8,7 @@ import 'package:roadsafe_mobile/backend/backend.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
-    'Registration sends normalized full name and email and signs in by email',
+    'Registration keeps profile name and contact email separate from username login',
     () async {
       Map<String, dynamic>? payload;
       final client = SupabaseClient(
@@ -32,6 +32,7 @@ void main() {
           ' MARIA@EXAMPLE.COM ',
           'fixture-password',
           fullName: ' Maria   Santos ',
+          username: ' Maria_Officer ',
           accountType: 'Officer',
           stationId: 'way/2',
         ),
@@ -40,11 +41,12 @@ void main() {
       expect(payload, {
         'email': 'maria@example.com',
         'fullName': 'Maria Santos',
+        'username': 'maria_officer',
         'password': 'fixture-password',
         'accountType': 'Officer',
         'stationId': 'way/2',
       });
-      expect(backend.loginEmail, 'maria@example.com');
+      expect(backend.loginEmail, 'maria_officer');
     },
   );
   test(

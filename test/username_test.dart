@@ -17,7 +17,7 @@ void main() {
     },
   );
 
-  testWidgets('Registration asks for full name, email and password', (
+  testWidgets('Registration asks for full name, username, email and password', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -26,8 +26,8 @@ void main() {
     await tester.pump();
     expect(find.text('Full name'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNWidgets(3));
-    expect(find.text('Username'), findsNothing);
+    expect(find.byType(TextFormField), findsNWidgets(4));
+    expect(find.text('Username'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.textContaining('confirm your account'), findsNothing);
   });

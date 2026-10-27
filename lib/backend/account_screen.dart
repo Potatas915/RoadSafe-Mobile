@@ -31,6 +31,7 @@ class _AccountScreenState extends State<AccountScreen> {
   final _form = GlobalKey<FormState>();
 
   final _username = TextEditingController();
+  final _email = TextEditingController();
   final _fullName = TextEditingController();
   final _password = TextEditingController();
   bool get _register => widget.registration;
@@ -86,6 +87,7 @@ class _AccountScreenState extends State<AccountScreen> {
   @override
   void dispose() {
     _username.dispose();
+    _email.dispose();
     _fullName.dispose();
     _password.dispose();
     super.dispose();
@@ -106,9 +108,10 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       if (_register) {
         final signedIn = await backend.signUp(
-          _username.text,
+          _email.text,
           _password.text,
           fullName: _fullName.text,
+          username: _username.text,
           accountType: _accountType,
           stationId: _accountType == 'Officer' ? _station : null,
         );
@@ -128,7 +131,7 @@ class _AccountScreenState extends State<AccountScreen> {
         if (!signedIn) {
           setState(() {
             _messageOk = true;
-            _message = 'Account created. Sign in with your email and password.';
+            _message = 'Account created. Sign in with your username and password.';
           });
           return;
         }
@@ -396,6 +399,22 @@ class _AccountScreenState extends State<AccountScreen> {
         ],
         if (_register) ...[
           TextFormField(
+            controller: _username,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username],
+            decoration: const InputDecoration(
+              labelText: 'Username',
+              helperText: 'Use this unique username to sign in.',
+              prefixIcon: Icon(Icons.alternate_email),
+            ),
+            validator: (value) => validUsername(value ?? '')
+                ? null
+                : 'Use 3–24 letters, numbers or underscores; start with a letter.',
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
             controller: _fullName,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
@@ -410,7 +429,7 @@ class _AccountScreenState extends State<AccountScreen> {
           const SizedBox(height: 16),
         ],
         TextFormField(
-          controller: _username,
+          controller: _register ? _email : _username,
           keyboardType: _register
               ? TextInputType.emailAddress
               : TextInputType.text,
@@ -423,7 +442,7 @@ class _AccountScreenState extends State<AccountScreen> {
           decoration: InputDecoration(
             labelText: _register ? 'Email' : 'Email or username',
             prefixIcon: const Icon(Icons.alternate_email),
-            helperText: _register ? 'Use this email to sign in.' : null,
+            helperText: _register ? 'Contact email. Sign in with your username.' : null,
             helperMaxLines: 2,
           ),
           validator: (v) => v == null || v.trim().isEmpty
