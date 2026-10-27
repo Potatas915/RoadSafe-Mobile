@@ -32,7 +32,13 @@ class _AccountScreenState extends State<AccountScreen> {
 
   final _username = TextEditingController();
   final _email = TextEditingController();
-  final _fullName = TextEditingController();
+  final _firstName = TextEditingController();
+  final _middleName = TextEditingController();
+  final _lastName = TextEditingController();
+  String get _fullName => [_firstName.text, _middleName.text, _lastName.text]
+      .map((part) => part.trim().replaceAll(RegExp(r'\s+'), ' '))
+      .where((part) => part.isNotEmpty)
+      .join(' ');
   final _password = TextEditingController();
   bool get _register => widget.registration;
   String _accountType = 'Public';
@@ -88,7 +94,9 @@ class _AccountScreenState extends State<AccountScreen> {
   void dispose() {
     _username.dispose();
     _email.dispose();
-    _fullName.dispose();
+    _firstName.dispose();
+    _middleName.dispose();
+    _lastName.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -100,6 +108,16 @@ class _AccountScreenState extends State<AccountScreen> {
       return;
     }
     if (!_form.currentState!.validate()) return;
+    if (_register) {
+      final nameError = validateReporterName(_fullName);
+      if (nameError != null) {
+        setState(() {
+          _messageOk = false;
+          _message = nameError;
+        });
+        return;
+      }
+    }
     setState(() {
       _busy = true;
       _message = null;
@@ -110,7 +128,7 @@ class _AccountScreenState extends State<AccountScreen> {
         final signedIn = await backend.signUp(
           _email.text,
           _password.text,
-          fullName: _fullName.text,
+          fullName: _fullName,
           username: _username.text,
           accountType: _accountType,
           stationId: _accountType == 'Officer' ? _station : null,
@@ -414,18 +432,11 @@ class _AccountScreenState extends State<AccountScreen> {
                 : 'Use 3–24 letters, numbers or underscores; start with a letter.',
           ),
           const SizedBox(height: 16),
-          TextFormField(
-            controller: _fullName,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.next,
-            autofillHints: const [AutofillHints.name],
-            decoration: const InputDecoration(
-              labelText: 'Full name',
-              hintText: 'First name and last name',
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-            validator: validateReporterName,
-          ),
+          _nameField(_firstName, 'First name', AutofillHints.givenName),
+          const SizedBox(height: 16),
+          _nameField(_middleName, 'Middle name', AutofillHints.middleName, optional: true),
+          const SizedBox(height: 16),
+          _nameField(_lastName, 'Last name', AutofillHints.familyName),
           const SizedBox(height: 16),
         ],
         TextFormField(
@@ -517,6 +528,27 @@ class _AccountScreenState extends State<AccountScreen> {
         ),
       ],
     ),
+  );
+
+  Widget _nameField(TextEditingController controller, String label, String autofillHint, {bool optional = false}) => TextFormField(
+    controller: controller,
+    textCapitalization: TextCapitalization.words,
+    textInputAction: TextInputAction.next,
+    autofillHints: [autofillHint],
+    decoration: InputDecoration(
+      labelText: label,
+      helperText: optional ? 'Optional' : null,
+      prefixIcon: const Icon(Icons.person_outline),
+    ),
+    validator: (value) {
+      final part = (value ?? '').trim();
+      if (part.isEmpty) return optional ? null : 'Enter your ${label.toLowerCase()}';
+      if (part.length > 60) return 'Use at most 60 characters';
+      if (!RegExp(r"^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$", unicode: true).hasMatch(part)) {
+        return 'Use letters only (no numbers or symbols)';
+      }
+      return null;
+    },
   );
 
   Widget _typeTile(String type, IconData icon, String label, String caption) {

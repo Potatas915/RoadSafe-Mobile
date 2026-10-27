@@ -110,8 +110,9 @@ void main() {
       },
     );
   }
+  for (final middleName in ['', 'Reyes']) {
   testWidgets(
-    'enforcer signup searches nationwide directory and saves station while awaiting approval',
+    'enforcer signup saves name parts with middle name "$middleName" and station while awaiting approval',
     (tester) async {
       final client = (await tester.runAsync(
         () async => SupabaseClient(
@@ -155,13 +156,21 @@ void main() {
       await tester.tap(find.byKey(const Key('account-type-Officer')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).at(0), 'maria_officer');
-      await tester.enterText(find.byType(TextFormField).at(1), 'Maria Santos');
+      await tester.ensureVisible(find.text('Create account'));
+      await tester.tap(find.text('Create account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter your first name'), findsOneWidget);
+      expect(find.text('Enter your last name'), findsOneWidget);
+      expect(backend.registrations, 0);
+      await tester.enterText(find.byType(TextFormField).at(1), ' Maria ');
+      await tester.enterText(find.byType(TextFormField).at(2), middleName);
+      await tester.enterText(find.byType(TextFormField).at(3), ' Santos ');
       await tester.enterText(
-        find.byType(TextFormField).at(2),
+        find.byType(TextFormField).at(4),
         'maria@example.com',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(3),
+        find.byType(TextFormField).at(5),
         'fixture_password',
       );
       await tester.ensureVisible(find.text('Create account'));
@@ -193,7 +202,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(backend.requestedType, 'Officer');
       expect(backend.requestedStation, 'way/2');
-      expect(backend.requestedName, 'Maria Santos');
+      expect(backend.requestedName, middleName.isEmpty ? 'Maria Santos' : 'Maria Reyes Santos');
       expect(backend.requestedEmail, 'maria@example.com');
       expect(backend.requestedUsername, 'maria_officer');
       expect(backend.signedOut, true);
@@ -207,4 +216,5 @@ void main() {
       expect(find.byKey(const Key('registration-station-picker')), findsNothing);
     },
   );
+  }
 }
