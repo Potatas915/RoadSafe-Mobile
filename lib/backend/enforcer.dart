@@ -27,6 +27,31 @@ List<String> enforcerStatuses(Map<String, dynamic> report, String? uid) {
 class EnforcerBackend {
   EnforcerBackend(this.backend);
   final RoadSafeBackend backend;
+  Future<void> complete(Map<String, dynamic> report, String remarks) async {
+    // Refresh before retrying so a saved In Progress step is not replayed.
+    var current = (await backend.reports(ownOnly: false))
+        .where((row) => row['id'] == report['id'])
+        .firstOrNull;
+    if (current == null || !isOwnActiveCase(current, backend.userId)) {
+      throw StateError('This case is no longer assigned to you.');
+    }
+    if (current['version'] != report['version']) {
+      throw StateError('This case changed. Refresh before completing it.');
+    }
+    if (current['status'] == 'Assigned') {
+      final nextVersion = (current['version'] as int) + 1;
+      await update(current, 'In Progress', remarks);
+      current = (await backend.reports(ownOnly: false))
+          .where((row) => row['id'] == report['id'])
+          .firstOrNull;
+      if (current == null || current['version'] != nextVersion ||
+          current['status'] != 'In Progress' ||
+          !isOwnActiveCase(current, backend.userId)) {
+        throw StateError('Could not confirm response progress. Refresh and retry.');
+      }
+    }
+    await update(current, 'Resolved / Closed', remarks);
+  }
   Future<Map<String, dynamic>?> medicalRecommendation(String reportId) async {
     final result = await backend.client.rpc(
       'get_medical_recommendation',

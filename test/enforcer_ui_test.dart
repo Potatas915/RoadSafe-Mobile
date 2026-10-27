@@ -8,6 +8,7 @@ const fixtureReportId = 'c12e363d-c13c-43b3-870c-399b7ecadf1a';
 
 class FixtureBackend extends RoadSafeBackend {
   int version = 3;
+  String status = 'Assigned';
   bool signedOut = false;
   @override
   Future<void> signOut() async {
@@ -22,7 +23,7 @@ class FixtureBackend extends RoadSafeBackend {
       'id': fixtureReportId,
       'version': version,
       'categoryLabel': 'Collision case',
-      'status': 'Assigned',
+      'status': status,
       'assignedOfficerId': 'officer',
       'isDuplicate': false,
       'reporter': {'userId': 'public'},
@@ -108,6 +109,8 @@ class FixtureApi extends EnforcerBackend {
     String status,
     String remarks,
   ) async {
+    (backend as FixtureBackend).status = status;
+    (backend as FixtureBackend).version++;
     writes.add({
       'rpc': 'update_accident_report',
       'p_version': report['version'],
@@ -264,21 +267,14 @@ void main() {
       await tester.ensureVisible(find.text('Collision case'));
       await tester.tap(find.text('Collision case'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Nearby hospitals & clinics'));
+      await tester.scrollUntilVisible(find.text('Nearby hospitals & clinics'), 150, scrollable: find.byType(Scrollable).first);
       expect(find.text('Fixture Hospital · Recommended'), findsOneWidget);
       expect(
         find.text('Hospital · 0.2 km straight-line distance'),
         findsOneWidget,
       );
-      await tester.scrollUntilVisible(
-        find.byType(DropdownButtonFormField<String>),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('In Progress · Responding / on scene').last);
-      await tester.pumpAndSettle();
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      await tester.scrollUntilVisible(find.byType(TextField), 200, scrollable: find.byType(Scrollable).first);
       await tester.enterText(
         find.byType(TextField),
         'On scene. Findings: road obstruction. Actions: assisted safely.',
@@ -286,15 +282,17 @@ void main() {
       backend.version = 5;
       await tester.pump(const Duration(seconds: 15));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Save response update'));
-      await tester.tap(find.text('Save response update'));
+      await tester.ensureVisible(find.text('Complete'));
+      await tester.tap(find.text('Complete'));
       await tester.pumpAndSettle();
-      final update = writes.singleWhere(
+      final updates = writes.where(
         (w) => w['rpc'] == 'update_accident_report',
-      );
-      expect(update['p_version'], 5);
+      ).toList();
+      expect(updates.map((w) => w['p_status']), ['In Progress', 'Resolved / Closed']);
+      final update = updates.last;
+      expect(update['p_version'], 6);
       expect(update['p_officer'], 'officer');
-      expect(update['p_status'], 'In Progress');
+      expect(update['p_status'], 'Resolved / Closed');
       expect(update['p_remarks'], contains('Actions: assisted safely.'));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

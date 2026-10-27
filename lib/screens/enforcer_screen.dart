@@ -319,7 +319,7 @@ class _EnforcerScreenState extends State<EnforcerScreen>
           children: [
             RoadSafeLogo(size: 30),
             SizedBox(width: 10),
-            Text('Enforcer response'),
+            Expanded(child: Text('Enforcer response', overflow: TextOverflow.ellipsis)),
           ],
         ),
         actions: [
@@ -695,16 +695,13 @@ class _CaseScreenState extends State<_CaseScreen> {
   late Map<String, dynamic> currentReport = widget.report;
   Map<String, dynamic>? medicalRecommendation;
   String? medicalError;
-  late String status;
+
   bool saving = false;
   String? error;
   @override
   void initState() {
     super.initState();
     remarks.text = widget.report['officialRemarks'] as String? ?? '';
-    status =
-        enforcerStatuses(widget.report, backend.userId).firstOrNull ??
-        widget.report['status'] as String;
     accessible = enforcerStatuses(widget.report, backend.userId).isNotEmpty;
     loadMedical();
     accessTimer = Timer.periodic(
@@ -780,7 +777,7 @@ class _CaseScreenState extends State<_CaseScreen> {
       error = null;
     });
     try {
-      await widget.service.update(currentReport, status, remarks.text);
+      await widget.service.complete(currentReport, remarks.text);
       if (mounted) Navigator.pop(context);
     } catch (failure) {
       if (mounted) {
@@ -1110,31 +1107,6 @@ class _CaseScreenState extends State<_CaseScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: status,
-                  decoration: const InputDecoration(
-                    labelText: 'Response status',
-                    prefixIcon: Icon(Icons.flag_outlined),
-                  ),
-                  items: enforcerStatuses(report, backend.userId)
-                      .map(
-                        (s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(
-                            s == 'In Progress'
-                                ? 'In Progress · Responding / on scene'
-                                : s,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: saving
-                      ? null
-                      : (value) => setState(() => status = value!),
-                ),
-                const SizedBox(height: 16),
                 TextField(
                   controller: remarks,
                   enabled: !saving,
@@ -1170,13 +1142,9 @@ class _CaseScreenState extends State<_CaseScreen> {
                       ),
                     ),
                     onPressed: saving ? null : save,
-                    icon: const Icon(Icons.save_outlined),
+                    icon: const Icon(Icons.check_circle_outline),
                     label: Text(
-                      saving
-                          ? 'Saving…'
-                          : status == 'Verified'
-                          ? 'Verify accident information'
-                          : 'Save response update',
+                      saving ? 'Completing…' : 'Complete',
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
