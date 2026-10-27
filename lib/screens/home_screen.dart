@@ -598,7 +598,7 @@ class _DashboardState extends State<_Dashboard> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          _stat('Sent', _reports.length, Icons.send_outlined),
+                          _stat('All', _reports.length, Icons.layers_outlined),
                           const SizedBox(width: 10),
                           _stat('Open', open, Icons.timelapse),
                           const SizedBox(width: 10),
