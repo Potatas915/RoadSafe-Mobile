@@ -510,7 +510,8 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
               'People hurt',
               'Injured: ${report['injuries']?['injuredCount'] ?? 'Unknown'} · Fatalities: ${report['injuries']?['fatalityCount'] ?? 'Unknown'}',
             ),
-            if (remarks.isNotEmpty) _detail('Team update', remarks),
+            if (remarks.isNotEmpty)
+              _detail('Official remarks (includes earlier updates)', remarks),
             if (report['isDuplicate'] == true)
               _detail('Note', 'Marked as a duplicate report'),
             if (report['rejectionReason'] != null)
@@ -582,7 +583,7 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
     final title = data['type'] == 'facts_corrected'
         ? 'Incident facts corrected'
         : '${data['status'] ?? data['type'] ?? 'Update'}';
-    final message = '${data['message'] ?? ''}'.trim();
+    final message = reportEventMessage(data);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,

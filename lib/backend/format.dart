@@ -1,4 +1,14 @@
-/// Small date helpers shared by the resident screens.
+// Display helpers shared by the resident screens.
+
+String reportEventMessage(Map event) {
+  final message = '${event['message'] ?? ''}'.trim();
+  // Assignment events carry a snapshot of remarks, including prior cancellations.
+  if (event['type'] == 'assignment_changed' && event['status'] == 'Assigned') {
+    return 'An enforcer was assigned to this report.'
+        '${message.isEmpty ? '' : '\nRemarks on record (may include earlier updates):\n$message'}';
+  }
+  return message;
+}
 
 const _months = [
   'Jan',
