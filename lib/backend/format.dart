@@ -1,8 +1,14 @@
 // Display helpers shared by the resident screens.
 
 String reportEventMessage(Map event) {
-  final message = '${event['message'] ?? ''}'.trim();
-  // Assignment events carry a snapshot of remarks, including prior cancellations.
+  var message = '${event['message'] ?? ''}'.trim();
+  // Later response events inherit cumulative remarks from earlier cancellations.
+  // Keep the actual cancellation event and immutable stored messages unchanged.
+  if (['Assigned', 'In Progress', 'Resolved / Closed'].contains(event['status'])) {
+    message = message.split('\n').where((line) =>
+      line.trim() != 'Police station request cancelled; officer unassigned.'
+    ).join('\n').trim();
+  }
   if (event['type'] == 'assignment_changed' && event['status'] == 'Assigned') {
     return 'An enforcer was assigned to this report.'
         '${message.isEmpty ? '' : '\nRemarks on record (may include earlier updates):\n$message'}';
