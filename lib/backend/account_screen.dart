@@ -132,7 +132,7 @@ class _AccountScreenState extends State<AccountScreen> {
           _password.text,
           fullName: _fullName,
           mobileNumber: _mobileNumber.text,
-          username: _username.text,
+          username: _accountType == 'Officer' ? null : _username.text,
           accountType: _accountType,
           stationId: _accountType == 'Officer' ? _station : null,
         );
@@ -153,7 +153,7 @@ class _AccountScreenState extends State<AccountScreen> {
           setState(() {
             _messageOk = true;
             _message =
-                'Account created. Sign in with your username and password.';
+                _accountType == 'Officer' ? 'Account created. Sign in with your email and password.' : 'Account created. Sign in with your username and password.';
           });
           return;
         }
@@ -423,6 +423,7 @@ class _AccountScreenState extends State<AccountScreen> {
           const SizedBox(height: 8),
         ],
         if (_register) ...[
+          if (_accountType != 'Officer') ...[
           TextFormField(
             controller: _username,
             autocorrect: false,
@@ -439,6 +440,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 : 'Use 3–24 letters, numbers or underscores; start with a letter.',
           ),
           const SizedBox(height: 16),
+          ],
           _nameField(_firstName, 'First name', AutofillHints.givenName),
           const SizedBox(height: 16),
           _nameField(
@@ -453,28 +455,28 @@ class _AccountScreenState extends State<AccountScreen> {
         ],
         TextFormField(
           controller: _register ? _email : _username,
-          keyboardType: _register
+          keyboardType: _register || widget.enforcer
               ? TextInputType.emailAddress
               : TextInputType.text,
           textInputAction: TextInputAction.next,
           autocorrect: false,
           enableSuggestions: false,
-          autofillHints: _register
+          autofillHints: _register || widget.enforcer
               ? const [AutofillHints.email]
               : const [AutofillHints.username],
           decoration: InputDecoration(
-            labelText: _register ? 'Email' : 'Email or username',
+            labelText: _register || widget.enforcer ? 'Email' : 'Email or username',
             prefixIcon: const Icon(Icons.alternate_email),
             helperText: _register
-                ? 'Contact email. Sign in with your username.'
+                ? (_accountType == 'Officer' ? 'Use this email to sign in.' : 'Contact email. Sign in with your username.')
                 : null,
             helperMaxLines: 2,
           ),
           validator: (v) => v == null || v.trim().isEmpty
-              ? (_register
+              ? (_register || widget.enforcer
                     ? 'Enter your email'
                     : 'Enter your email or username')
-              : _register && !validAccountEmail(v)
+              : (_register || widget.enforcer) && !validAccountEmail(v)
               ? 'Enter a valid email address'
               : null,
         ),

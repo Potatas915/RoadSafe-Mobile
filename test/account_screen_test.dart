@@ -93,7 +93,7 @@ void main() {
         expect(calls, isEmpty);
         await tester.enterText(
           find.byType(TextFormField).at(0),
-          'fixture_officer',
+          'fixture-officer@example.com',
         );
         await tester.enterText(
           find.byType(TextFormField).at(1),
@@ -156,22 +156,22 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('account-type-Officer')));
       await tester.tap(find.byKey(const Key('account-type-Officer')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField).at(0), 'maria_officer');
+      expect(find.text('Username'), findsNothing);
       await tester.ensureVisible(find.text('Create account'));
       await tester.tap(find.text('Create account'));
       await tester.pumpAndSettle();
       expect(find.text('Enter your first name'), findsOneWidget);
       expect(find.text('Enter your last name'), findsOneWidget);
       expect(backend.registrations, 0);
-      await tester.enterText(find.byType(TextFormField).at(1), ' Maria ');
-      await tester.enterText(find.byType(TextFormField).at(2), middleName);
-      await tester.enterText(find.byType(TextFormField).at(3), ' Santos ');
+      await tester.enterText(find.byType(TextFormField).at(0), ' Maria ');
+      await tester.enterText(find.byType(TextFormField).at(1), middleName);
+      await tester.enterText(find.byType(TextFormField).at(2), ' Santos ');
       await tester.enterText(
-        find.byType(TextFormField).at(4),
+        find.byType(TextFormField).at(3),
         'maria@example.com',
       );
       await tester.enterText(
-        find.byType(TextFormField).at(5),
+        find.byType(TextFormField).at(4),
         'fixture_password',
       );
       await tester.ensureVisible(find.byKey(const Key('registration-mobile')));
@@ -207,7 +207,7 @@ void main() {
       expect(backend.requestedStation, 'way/2');
       expect(backend.requestedName, middleName.isEmpty ? 'Maria Santos' : 'Maria Reyes Santos');
       expect(backend.requestedEmail, 'maria@example.com');
-      expect(backend.requestedUsername, 'maria_officer');
+      expect(backend.requestedUsername, isNull);
       expect(backend.signedOut, true);
       expect(find.textContaining('An Admin must verify'), findsOneWidget);
       expect(find.text('Create account'), findsNothing);

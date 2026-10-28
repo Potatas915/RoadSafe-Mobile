@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/roadsafe_theme.dart';
 import '../widgets/report_progress.dart';
+import '../widgets/accident_category_icon.dart';
 import 'backend.dart';
 import 'format.dart';
 
@@ -444,9 +445,8 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen>
                   color: RoadSafeColors.orange.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.car_crash_outlined,
-                  size: 20,
+                child: AccidentCategoryIcon(
+                  categoryId: report['categoryId'] as String?,
                   color: RoadSafeColors.orange,
                 ),
               ),
