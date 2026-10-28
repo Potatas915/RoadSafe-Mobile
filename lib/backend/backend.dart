@@ -96,6 +96,36 @@ class RoadSafeBackend extends ChangeNotifier {
     await client.auth.signInWithPassword(email: identity, password: password);
   }
 
+  Future<void> signInResident(String identifier, String password) async {
+    try {
+      await signIn(identifier, password);
+      return;
+    } on AuthException catch (error) {
+      if (error.code != 'invalid_credentials' || !validAccountEmail(identifier)) {
+        rethrow;
+      }
+    }
+    try {
+      final result = await client.functions.invoke(
+        'sign-in-resident',
+        body: {'email': identifier.trim().toLowerCase(), 'password': password},
+      );
+      final data = result.data;
+      final token = data is Map ? data['refresh_token'] : null;
+      if (token is! String || token.isEmpty) {
+        throw const AuthException('Could not sign in. Try again.');
+      }
+      await client.auth.setSession(token);
+    } on FunctionException catch (error) {
+      final details = error.details;
+      throw AuthException(
+        details is Map && details['message'] is String
+            ? details['message'] as String
+            : 'Could not sign in. Try your username or retry later.',
+      );
+    }
+  }
+
   Future<bool> signUp(
     String email,
     String password, {

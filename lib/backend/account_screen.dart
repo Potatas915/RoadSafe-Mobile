@@ -153,12 +153,16 @@ class _AccountScreenState extends State<AccountScreen> {
           setState(() {
             _messageOk = true;
             _message =
-                _accountType == 'Officer' ? 'Account created. Sign in with your email and password.' : 'Account created. Sign in with your username and password.';
+                _accountType == 'Officer' ? 'Account created. Sign in with your email and password.' : 'Account created. Sign in with your email or username and password.';
           });
           return;
         }
       } else {
-        await backend.signIn(_username.text, _password.text);
+        if (widget.enforcer) {
+          await backend.signIn(_username.text, _password.text);
+        } else {
+          await backend.signInResident(_username.text, _password.text);
+        }
       }
       if (widget.enforcer && !_register) {
         try {
@@ -432,7 +436,7 @@ class _AccountScreenState extends State<AccountScreen> {
             autofillHints: const [AutofillHints.username],
             decoration: const InputDecoration(
               labelText: 'Username',
-              helperText: 'Use this unique username to sign in.',
+              helperText: 'Sign in with this username or your contact email.',
               prefixIcon: Icon(Icons.alternate_email),
             ),
             validator: (value) => validUsername(value ?? '')
@@ -468,7 +472,7 @@ class _AccountScreenState extends State<AccountScreen> {
             labelText: _register || widget.enforcer ? 'Email' : 'Email or username',
             prefixIcon: const Icon(Icons.alternate_email),
             helperText: _register
-                ? (_accountType == 'Officer' ? 'Use this email to sign in.' : 'Contact email. Sign in with your username.')
+                ? (_accountType == 'Officer' ? 'Use this email to sign in.' : 'Sign in with this email or your username.')
                 : null,
             helperMaxLines: 2,
           ),
