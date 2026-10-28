@@ -6,7 +6,7 @@ const _blue = Color(0xFF60A5FA);
 const _amber = Color(0xFFFBBF24);
 
 /// The steps a report moves through, as the resident sees them.
-const reportStages = ['Sent', 'Verified', 'Responding', 'Complete'];
+const reportStages = ['Sent', 'Verified', 'Assigned', 'Responding', 'Resolved'];
 
 /// Index into [reportStages], or -1 when the status is outside the normal path
 /// (for example a rejected report).
@@ -19,10 +19,11 @@ int reportStage(String status) {
     case 'Verified':
       return 1;
     case 'Assigned':
-    case 'In Progress':
       return 2;
-    case 'Resolved / Closed':
+    case 'In Progress':
       return 3;
+    case 'Resolved / Closed':
+      return 4;
     default:
       return -1;
   }
@@ -81,7 +82,7 @@ class ReportStatusChip extends StatelessWidget {
   }
 }
 
-/// Response activity starts on assignment and ends at completion.
+/// A five-step bar with animation while the enforcer is responding.
 class ReportProgress extends StatelessWidget {
   const ReportProgress({super.key, required this.status});
   final String status;
@@ -101,7 +102,7 @@ class ReportProgress extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (i == stage && i == 2 && !MediaQuery.disableAnimationsOf(context))
+                  if (i == stage && i == 3 && !MediaQuery.disableAnimationsOf(context))
                     const Directionality(
                       textDirection: TextDirection.ltr,
                       child: LinearProgressIndicator(
