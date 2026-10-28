@@ -130,6 +130,9 @@ void main() {
     expect(find.text('Verify'), findsNothing);
     expect(find.text('My cases'), findsOneWidget);
     expect(find.text('Collision case'), findsOneWidget);
+    expect(find.text('Responding'), findsOneWidget);
+    expect(find.text('Assigned'), findsNothing);
+    expect(find.text('In Progress'), findsNothing);
     expect(find.text('Unassigned accident'), findsNothing);
     expect(find.text('Other officer accident'), findsNothing);
     expect(find.text('Closed accident'), findsNothing);
@@ -274,6 +277,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.text('Responding'), findsOneWidget);
+      expect(find.text('In Progress'), findsNothing);
       await tester.scrollUntilVisible(find.byType(TextField), 200, scrollable: find.byType(Scrollable).first);
       await tester.enterText(
         find.byType(TextField),

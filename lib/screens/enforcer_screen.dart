@@ -38,7 +38,6 @@ String _when(Object? iso) {
 Color _statusColor(String status) {
   switch (status) {
     case 'Assigned':
-      return RoadSafeColors.orange;
     case 'In Progress':
     case 'Verified':
       return _blue;
@@ -48,6 +47,12 @@ Color _statusColor(String status) {
       return _amber;
   }
 }
+
+String _responseLabel(String status) => switch (status) {
+  'Assigned' || 'In Progress' => 'Responding',
+  'Resolved / Closed' => 'Complete',
+  _ => status,
+};
 
 String _injuryLabel(Object? status) {
   switch (status) {
@@ -100,7 +105,7 @@ class _StatusChip extends StatelessWidget {
           ],
           Flexible(
             child: Text(
-              label,
+              _responseLabel(label),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: tint,
