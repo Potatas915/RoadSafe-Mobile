@@ -17,7 +17,8 @@ class ReportTrackingScreen extends StatefulWidget {
   State<ReportTrackingScreen> createState() => _ReportTrackingScreenState();
 }
 
-class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
+class _ReportTrackingScreenState extends State<ReportTrackingScreen>
+    with WidgetsBindingObserver {
   late final backend = widget.backend ?? RoadSafeBackend.instance;
   final _savingUpdates = <int>{};
   List<Map<String, dynamic>> _reports = [];
@@ -31,16 +32,25 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refresh();
     _timer = backend.ready
-        ? Timer.periodic(const Duration(seconds: 15), (_) => _refresh())
+        ? Timer.periodic(const Duration(seconds: 5), (_) => _refresh())
         : null;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && backend.ready) {
+      _refresh();
+    }
   }
 
   Future<void> _refresh() async {
