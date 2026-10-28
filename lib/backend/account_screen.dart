@@ -238,6 +238,9 @@ class _AccountScreenState extends State<AccountScreen> {
             constraints: const BoxConstraints(maxWidth: 440),
             child: Form(
               key: _form,
+              autovalidateMode: _register
+                  ? AutovalidateMode.onUserInteraction
+                  : AutovalidateMode.disabled,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -499,7 +502,13 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           validator: (v) =>
-              v == null || v.length < 8 ? 'Use at least 8 characters' : null,
+              v == null || v.isEmpty
+              ? 'Enter your password'
+              : _register && v.trim().isEmpty
+              ? 'Password cannot contain only spaces'
+              : v.length < 8
+              ? 'Use at least 8 characters'
+              : null,
         ),
         if (_register) ...[
           const SizedBox(height: 16),
