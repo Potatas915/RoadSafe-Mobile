@@ -32,6 +32,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
   final _username = TextEditingController();
   final _email = TextEditingController();
+  final _mobileNumber = TextEditingController();
   final _firstName = TextEditingController();
   final _middleName = TextEditingController();
   final _lastName = TextEditingController();
@@ -94,6 +95,7 @@ class _AccountScreenState extends State<AccountScreen> {
   void dispose() {
     _username.dispose();
     _email.dispose();
+    _mobileNumber.dispose();
     _firstName.dispose();
     _middleName.dispose();
     _lastName.dispose();
@@ -129,6 +131,7 @@ class _AccountScreenState extends State<AccountScreen> {
           _email.text,
           _password.text,
           fullName: _fullName,
+          mobileNumber: _mobileNumber.text,
           username: _username.text,
           accountType: _accountType,
           stationId: _accountType == 'Officer' ? _station : null,
@@ -149,7 +152,8 @@ class _AccountScreenState extends State<AccountScreen> {
         if (!signedIn) {
           setState(() {
             _messageOk = true;
-            _message = 'Account created. Sign in with your username and password.';
+            _message =
+                'Account created. Sign in with your username and password.';
           });
           return;
         }
@@ -434,7 +438,12 @@ class _AccountScreenState extends State<AccountScreen> {
           const SizedBox(height: 16),
           _nameField(_firstName, 'First name', AutofillHints.givenName),
           const SizedBox(height: 16),
-          _nameField(_middleName, 'Middle name', AutofillHints.middleName, optional: true),
+          _nameField(
+            _middleName,
+            'Middle name',
+            AutofillHints.middleName,
+            optional: true,
+          ),
           const SizedBox(height: 16),
           _nameField(_lastName, 'Last name', AutofillHints.familyName),
           const SizedBox(height: 16),
@@ -453,7 +462,9 @@ class _AccountScreenState extends State<AccountScreen> {
           decoration: InputDecoration(
             labelText: _register ? 'Email' : 'Email or username',
             prefixIcon: const Icon(Icons.alternate_email),
-            helperText: _register ? 'Contact email. Sign in with your username.' : null,
+            helperText: _register
+                ? 'Contact email. Sign in with your username.'
+                : null,
             helperMaxLines: 2,
           ),
           validator: (v) => v == null || v.trim().isEmpty
@@ -490,6 +501,24 @@ class _AccountScreenState extends State<AccountScreen> {
           validator: (v) =>
               v == null || v.length < 8 ? 'Use at least 8 characters' : null,
         ),
+        if (_register) ...[
+          const SizedBox(height: 16),
+          TextFormField(
+            key: const Key('registration-mobile'),
+            controller: _mobileNumber,
+            keyboardType: TextInputType.phone,
+            autofillHints: const [AutofillHints.telephoneNumber],
+            maxLength: 20,
+            validator: validateReporterContact,
+            decoration: const InputDecoration(
+              labelText: 'Mobile number',
+              hintText: 'e.g. 0917 123 4567',
+              helperText: 'Saved to your profile for accident reports.',
+              prefixIcon: Icon(Icons.phone_outlined),
+              counterText: '',
+            ),
+          ),
+        ],
         if (_message != null) ...[
           const SizedBox(height: 16),
           _banner(
@@ -521,7 +550,9 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                   )
                 : Text(
-                    _register && !_accountCreated ? 'Create account' : 'Sign in',
+                    _register && !_accountCreated
+                        ? 'Create account'
+                        : 'Sign in',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
           ),
@@ -530,7 +561,12 @@ class _AccountScreenState extends State<AccountScreen> {
     ),
   );
 
-  Widget _nameField(TextEditingController controller, String label, String autofillHint, {bool optional = false}) => TextFormField(
+  Widget _nameField(
+    TextEditingController controller,
+    String label,
+    String autofillHint, {
+    bool optional = false,
+  }) => TextFormField(
     controller: controller,
     textCapitalization: TextCapitalization.words,
     textInputAction: TextInputAction.next,
@@ -542,9 +578,13 @@ class _AccountScreenState extends State<AccountScreen> {
     ),
     validator: (value) {
       final part = (value ?? '').trim();
-      if (part.isEmpty) return optional ? null : 'Enter your ${label.toLowerCase()}';
+      if (part.isEmpty)
+        return optional ? null : 'Enter your ${label.toLowerCase()}';
       if (part.length > 60) return 'Use at most 60 characters';
-      if (!RegExp(r"^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$", unicode: true).hasMatch(part)) {
+      if (!RegExp(
+        r"^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$",
+        unicode: true,
+      ).hasMatch(part)) {
         return 'Use letters only (no numbers or symbols)';
       }
       return null;

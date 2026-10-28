@@ -7,6 +7,86 @@ import 'package:roadsafe_mobile/backend/backend.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final savedContact in ['', '09171234567']) {
+    test(
+      'reporter profile reuses saved contact or persists a marked test placeholder: $savedContact',
+      () async {
+        const uid = '11111111-1111-4111-8111-111111111111';
+        var metadata = <String, dynamic>{'mobile_number': savedContact};
+        var writes = 0;
+        Map<String, dynamic> user() => {
+          'id': uid,
+          'aud': 'authenticated',
+          'email': 'fixture@example.test',
+          'created_at': '2026-10-17T00:00:00Z',
+          'app_metadata': {},
+          'user_metadata': metadata,
+        };
+        final payload = base64Url
+            .encode(
+              utf8.encode(
+                jsonEncode({
+                  'sub': uid,
+                  'exp':
+                      DateTime.now()
+                          .add(const Duration(hours: 1))
+                          .millisecondsSinceEpoch ~/
+                      1000,
+                }),
+              ),
+            )
+            .replaceAll('=', '');
+        final token = 'eyJhbGciOiJIUzI1NiJ9.$payload.signature';
+        final client = SupabaseClient(
+          'https://fixture.supabase.co',
+          'fixture',
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+          httpClient: MockClient((request) async {
+            Object response;
+            if (request.url.path.endsWith('/token')) {
+              response = {
+                'access_token': token,
+                'refresh_token': 'refresh',
+                'token_type': 'bearer',
+                'expires_in': 3600,
+                'user': user(),
+              };
+            } else if (request.url.path == '/auth/v1/user') {
+              if (request.method == 'PUT') {
+                metadata = Map<String, dynamic>.from(
+                  (jsonDecode(request.body) as Map)['data'] as Map,
+                );
+                writes++;
+              }
+              response = user();
+            } else {
+              expect(request.url.path, '/rest/v1/profiles');
+              expect(request.url.queryParameters['id'], 'eq.$uid');
+              response = {'name': 'Fixture Reporter'};
+            }
+            return http.Response(
+              jsonEncode(response),
+              200,
+              headers: {'content-type': 'application/json'},
+              request: request,
+            );
+          }),
+        );
+        addTearDown(client.dispose);
+        final backend = RoadSafeBackend(client: client);
+        await backend.signIn('fixture@example.test', 'fixture-password');
+        final profile = await backend.reporterProfile();
+        expect(profile, {
+          'name': 'Fixture Reporter',
+          'contact': savedContact.isEmpty ? '09000000000' : savedContact,
+        });
+        expect(writes, savedContact.isEmpty ? 1 : 0);
+        if (savedContact.isEmpty) {
+          expect(metadata['mobile_number_is_test'], true);
+        }
+      },
+    );
+  }
   test(
     'Registration keeps profile name and contact email separate from username login',
     () async {
@@ -32,6 +112,7 @@ void main() {
           ' MARIA@EXAMPLE.COM ',
           'fixture-password',
           fullName: ' Maria   Santos ',
+          mobileNumber: '09171234567',
           username: ' Maria_Officer ',
           accountType: 'Officer',
           stationId: 'way/2',
@@ -41,6 +122,7 @@ void main() {
       expect(payload, {
         'email': 'maria@example.com',
         'fullName': 'Maria Santos',
+        'mobileNumber': '09171234567',
         'username': 'maria_officer',
         'password': 'fixture-password',
         'accountType': 'Officer',
@@ -211,6 +293,11 @@ void main() {
 }
 
 class RegistrationCaptureBackend extends RoadSafeBackend {
+  @override
+  Future<void> saveMobileNumber(String mobileNumber) async {
+    expect(mobileNumber, '09171234567');
+  }
+
   RegistrationCaptureBackend({super.client});
   String? loginEmail;
   @override

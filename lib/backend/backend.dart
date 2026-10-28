@@ -100,6 +100,7 @@ class RoadSafeBackend extends ChangeNotifier {
     String email,
     String password, {
     required String fullName,
+    String mobileNumber = '',
     String? username,
     String accountType = 'Public',
     String? stationId,
@@ -108,9 +109,15 @@ class RoadSafeBackend extends ChangeNotifier {
     final name = fullName.trim().replaceAll(RegExp(r'\s+'), ' ');
     final nameError = validateReporterName(name);
     if (nameError != null) throw AuthException(nameError);
-    if (!validAccountEmail(canonical)) throw const AuthException('Enter a valid email address.');
+    final contactError = validateReporterContact(mobileNumber);
+    if (contactError != null) throw AuthException(contactError);
+    if (!validAccountEmail(canonical)) {
+      throw const AuthException('Enter a valid email address.');
+    }
     if (username != null && !validUsername(username)) {
-      throw const AuthException('Use 3–24 letters, numbers or underscores; start with a letter.');
+      throw const AuthException(
+        'Use 3–24 letters, numbers or underscores; start with a letter.',
+      );
     }
     try {
       await client.functions.invoke(
@@ -118,6 +125,7 @@ class RoadSafeBackend extends ChangeNotifier {
         body: {
           'email': canonical,
           'fullName': name,
+          'mobileNumber': mobileNumber.trim(),
           if (username != null) 'username': normalizeUsername(username),
           'password': password,
           'accountType': accountType,
@@ -135,7 +143,11 @@ class RoadSafeBackend extends ChangeNotifier {
     // Registration has succeeded. A connection interruption during automatic
     // sign-in must not tell the user that the account was never created.
     try {
-      await signIn(username == null ? canonical : normalizeUsername(username), password);
+      await signIn(
+        username == null ? canonical : normalizeUsername(username),
+        password,
+      );
+      await saveMobileNumber(mobileNumber);
       return true;
     } catch (_) {
       return false;
@@ -143,6 +155,41 @@ class RoadSafeBackend extends ChangeNotifier {
   }
 
   Future<void> signOut() => client.auth.signOut();
+
+  Future<Map<String, String>> reporterProfile() async {
+    final user = (await client.auth.getUser()).user;
+    if (user == null) throw StateError('Sign in to use your profile.');
+    final profile = await client
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+    var contact = '${user.userMetadata?['mobile_number'] ?? ''}';
+    if (contact.trim().isEmpty) {
+      // User-authorized placeholder for existing development/test accounts only.
+      contact = '09000000000';
+      await client.auth.updateUser(
+        UserAttributes(
+          data: {'mobile_number': contact, 'mobile_number_is_test': true},
+        ),
+      );
+    }
+    return {'name': '${profile['name'] ?? ''}', 'contact': contact};
+  }
+
+  Future<void> saveMobileNumber(String mobileNumber) async {
+    final error = validateReporterContact(mobileNumber);
+    if (error != null) throw StateError(error);
+    await client.auth.updateUser(
+      UserAttributes(
+        data: {
+          'mobile_number': mobileNumber.trim(),
+          'mobile_number_is_test': false,
+        },
+      ),
+    );
+  }
+
   Future<String> submit(Map<String, dynamic> params) async {
     if (!signedIn) throw StateError('Sign in before sending your report.');
     return (await client.rpc('submit_accident_report', params: params))

@@ -29,6 +29,7 @@ class AccountBackend extends RoadSafeBackend {
     String email,
     String password, {
     required String fullName,
+    String mobileNumber = '',
     String? username,
     String accountType = 'Public',
     String? stationId,
@@ -173,6 +174,8 @@ void main() {
         find.byType(TextFormField).at(5),
         'fixture_password',
       );
+      await tester.ensureVisible(find.byKey(const Key('registration-mobile')));
+      await tester.enterText(find.byKey(const Key('registration-mobile')), '09171234567');
       await tester.ensureVisible(find.text('Create account'));
       await tester.tap(find.text('Create account'));
       await tester.pumpAndSettle();

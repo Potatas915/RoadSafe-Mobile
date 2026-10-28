@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import '../theme/roadsafe_theme.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../widgets/incident_location_picker.dart';
@@ -18,7 +17,9 @@ class ReportScreen extends StatefulWidget {
     super.key,
     this.locationPickerBuilder,
     this.categoryLoader,
+    this.backend,
   });
+  final RoadSafeBackend? backend;
 
   @visibleForTesting
   final Future<List<AccidentCategory>> Function()? categoryLoader;
@@ -35,6 +36,9 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
+  late final backend = widget.backend ?? RoadSafeBackend.instance;
+  bool _loadingProfile = false;
+  String? _profileUserId;
   final _evidence = EvidenceController();
   final _submission = SubmissionDraft();
   bool _sending = false;
@@ -56,7 +60,7 @@ class _ReportScreenState extends State<ReportScreen> {
   String _categoryLabel(String id) =>
       _catalog.firstWhere((row) => row.id == id).label;
   Future<void> _loadCategories() async {
-    if (!RoadSafeBackend.instance.ready && widget.categoryLoader == null) {
+    if (!backend.ready && widget.categoryLoader == null) {
       return;
     }
     setState(() {
@@ -64,8 +68,7 @@ class _ReportScreenState extends State<ReportScreen> {
     });
     try {
       final catalog =
-          await (widget.categoryLoader?.call() ??
-              RoadSafeBackend.instance.categories());
+          await (widget.categoryLoader?.call() ?? backend.categories());
       if (mounted) {
         setState(() {
           _catalog = catalog;
@@ -195,7 +198,6 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _sendReport() async {
-    final backend = RoadSafeBackend.instance;
     if (_sending || !backend.ready) return;
     if (!backend.signedIn) {
       await Navigator.push<bool>(
@@ -211,6 +213,11 @@ class _ReportScreenState extends State<ReportScreen> {
       _submissionMessage = null;
     });
     try {
+      if (_profileUserId != backend.userId) {
+        throw StateError(
+          'Your account changed. Return to location and review your profile again.',
+        );
+      }
       _submittedParams ??= buildSubmissionParams(
         submissionId: _submission.id,
         category: _category!,
@@ -301,12 +308,46 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  void _continue() {
-    if (_evidence.busy) return;
+  Future<void> _continue() async {
+    if (_evidence.busy || _loadingProfile) return;
     final valid = _step == 0
         ? _detailsKey.currentState!.validate()
         : _locationKey.currentState!.validate();
-    if (valid) _goTo(_step + 1);
+    if (!valid) return;
+    if (_step == 1) {
+      setState(() => _loadingProfile = true);
+      try {
+        if (!backend.signedIn) {
+          await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (_) => AccountScreen(backend: backend)),
+          );
+          if (!mounted || !backend.signedIn) return;
+        }
+        final profile = await backend.reporterProfile();
+        if (!mounted) return;
+        final nameError = validateReporterName(profile['name']);
+        final contactError = validateReporterContact(profile['contact']);
+        if (nameError != null || contactError != null) {
+          throw StateError(
+            'Your profile needs a valid full name and mobile number. Update your account before reporting.',
+          );
+        }
+        _name.text = profile['name']!;
+        _contact.text = profile['contact']!;
+        _profileUserId = backend.userId;
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not load your profile: $error')),
+          );
+        }
+        return;
+      } finally {
+        if (mounted) setState(() => _loadingProfile = false);
+      }
+    }
+    if (mounted) _goTo(_step + 1);
   }
 
   Widget _countField(
@@ -470,7 +511,7 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
       const SizedBox(height: 10),
       Text(
-        ['Accident details', 'Location & contact', 'Review'][_step],
+        ['Accident details', 'Accident location', 'Review'][_step],
         style: const TextStyle(fontSize: 12, color: RoadSafeColors.muted),
       ),
     ],
@@ -489,8 +530,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
             ),
-            if (RoadSafeBackend.instance.ready ||
-                widget.categoryLoader != null)
+            if (backend.ready || widget.categoryLoader != null)
               IconButton(
                 tooltip: 'Refresh categories',
                 visualDensity: VisualDensity.compact,
@@ -706,10 +746,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       runSpacing: 10,
                       children: [
                         for (final type in _vehicleTypes)
-                          SizedBox(
-                            width: width,
-                            child: _vehicleTile(type),
-                          ),
+                          SizedBox(width: width, child: _vehicleTile(type)),
                       ],
                     );
                   },
@@ -725,12 +762,15 @@ class _ReportScreenState extends State<ReportScreen> {
                         : RoadSafeColors.orange,
                     fontSize: 12,
                     height: 1.5,
-                    fontWeight:
-                        _vehicles.isEmpty ? FontWeight.w400 : FontWeight.w700,
+                    fontWeight: _vehicles.isEmpty
+                        ? FontWeight.w400
+                        : FontWeight.w700,
                   ),
                 ),
               ],
-              if (field.hasError && _vehicleStatus == 'known' && _vehicles.isEmpty)
+              if (field.hasError &&
+                  _vehicleStatus == 'known' &&
+                  _vehicles.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
@@ -812,50 +852,6 @@ class _ReportScreenState extends State<ReportScreen> {
               ],
             );
           },
-        ),
-        const SizedBox(height: 28),
-        _label('Full name (required)'),
-        TextFormField(
-          controller: _name,
-          key: const Key('reporter-name'),
-          maxLength: 60,
-          validator: validateReporterName,
-          textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.next,
-          autofillHints: const [AutofillHints.name],
-          inputFormatters: [
-            FilteringTextInputFormatter.deny(RegExp(r'[0-9]')),
-          ],
-          decoration: const InputDecoration(
-            hintText: 'e.g. Juan Dela Cruz',
-            helperText: 'First and last name, letters only',
-            counterText: '',
-          ),
-        ),
-        const SizedBox(height: 20),
-        _label('Contact number (required)'),
-        TextFormField(
-          controller: _contact,
-          key: const Key('reporter-contact'),
-          maxLength: 20,
-          validator: validateReporterContact,
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.done,
-          autofillHints: const [AutofillHints.telephoneNumber],
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s().]')),
-          ],
-          decoration: const InputDecoration(
-            hintText: 'e.g. 0917 123 4567',
-            helperText: 'A number the team can reach you on',
-            counterText: '',
-          ),
-        ),
-        const SizedBox(height: 20),
-        _notice(
-          Icons.info_outline,
-          'Why share contact details?',
-          'Your full name and contact number are required so the team can clarify your report.',
         ),
       ],
     ),
@@ -973,11 +969,11 @@ class _ReportScreenState extends State<ReportScreen> {
                 ],
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _sending
+                    onPressed: _sending || _loadingProfile
                         ? null
                         : _step < 2
                         ? _continue
-                        : RoadSafeBackend.instance.ready
+                        : backend.ready
                         ? _sendReport
                         : null,
                     icon: Icon(
@@ -990,11 +986,11 @@ class _ReportScreenState extends State<ReportScreen> {
                         'Review report',
                         _sending
                             ? 'Sending…'
-                            : !RoadSafeBackend.instance.ready
+                            : !backend.ready
                             ? 'Submission unavailable'
                             : _submission.reportId != null
                             ? 'Retry photo upload'
-                            : RoadSafeBackend.instance.signedIn
+                            : backend.signedIn
                             ? 'Submit report'
                             : 'Sign in & submit',
                       ][_step],

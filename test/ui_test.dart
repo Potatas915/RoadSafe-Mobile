@@ -10,6 +10,11 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 class _SignedInBackend extends RoadSafeBackend {
   @override
+  Future<Map<String, String>> reporterProfile() async => {
+    'name': 'Fixture Reporter',
+    'contact': '09000000000',
+  };
+  @override
   bool get signedIn => true;
   @override
   String? get userId => 'resident';
@@ -42,6 +47,7 @@ Future<void> pumpReportWithTestMap(WidgetTester tester) async {
     MaterialApp(
       theme: buildRoadSafeTheme(),
       home: ReportScreen(
+        backend: _SignedInBackend(),
         locationPickerBuilder: (initial, changed) => Column(
           children: [
             if (initial != null)
@@ -64,16 +70,8 @@ Future<void> pumpReportWithTestMap(WidgetTester tester) async {
 }
 
 Future<void> enterReporter(WidgetTester tester) async {
-  await tester.ensureVisible(find.byKey(const Key('reporter-name')));
-  await tester.enterText(
-    find.byKey(const Key('reporter-name')),
-    'Fixture Reporter',
-  );
-  await tester.ensureVisible(find.byKey(const Key('reporter-contact')));
-  await tester.enterText(
-    find.byKey(const Key('reporter-contact')),
-    '09000000000',
-  );
+  expect(find.byKey(const Key('reporter-name')), findsNothing);
+  expect(find.byKey(const Key('reporter-contact')), findsNothing);
   tester.testTextInput.hide();
   await tester.pumpAndSettle();
 }
@@ -133,9 +131,7 @@ void main() {
     (tester) async {
       await pumpReportWithTestMap(tester);
       await tester.tap(find.text('Collision'));
-      await tester.ensureVisible(
-        find.byKey(const Key('vehicle-status-known')),
-      );
+      await tester.ensureVisible(find.byKey(const Key('vehicle-status-known')));
       await tester.tap(find.byKey(const Key('vehicle-status-known')));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('description')));
