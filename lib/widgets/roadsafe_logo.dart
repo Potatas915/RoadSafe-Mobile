@@ -14,7 +14,7 @@ class RoadSafeLogo extends StatelessWidget {
       width: size,
       height: size,
       filterQuality: FilterQuality.high,
-      semanticLabel: 'RoadSafe logo',
+      semanticLabel: 'RoadTrack logo',
       errorBuilder: (_, _, _) => SizedBox(width: size, height: size),
     );
   }
@@ -37,7 +37,7 @@ class RoadSafeWordmark extends StatelessWidget {
             : 'assets/images/wordmark_light.png',
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
-        semanticLabel: 'Road Track logo',
+        semanticLabel: 'RoadTrack logo',
         errorBuilder: (_, _, _) => const SizedBox(height: 120),
       ),
     );

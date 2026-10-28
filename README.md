@@ -1,4 +1,4 @@
-# RoadSafe Mobile
+# RoadTrack Mobile
 
 Public accident reporting companion to the React web manager. Both clients connect to the same Supabase backend. Architecture, migration, permissions, and setup details are documented in `../supabase/README.md`.
 

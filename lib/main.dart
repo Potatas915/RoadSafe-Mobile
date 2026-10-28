@@ -18,7 +18,7 @@ class RoadSafeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'RoadSafe Mobile',
+      title: 'RoadTrack',
       debugShowCheckedModeBanner: false,
       theme: buildRoadSafeTheme(),
       home: const MobileRoleGate(),

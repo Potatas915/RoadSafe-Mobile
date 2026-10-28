@@ -417,7 +417,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           const SizedBox(height: 10),
                           Text(
                             [
-                              'Tell us what happened. Your report helps the RoadSafe team assess the incident.',
+                              'Tell us what happened. Your report helps the RoadTrack team assess the incident.',
                               'Place the pin where the accident happened, then confirm the location.',
                               'Make sure the details are accurate before sending them for review.',
                             ][_step],
@@ -465,7 +465,7 @@ class _ReportScreenState extends State<ReportScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'RoadSafe',
+                'RoadTrack',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
               ),
               Text(
@@ -929,7 +929,7 @@ class _ReportScreenState extends State<ReportScreen> {
       _notice(
         Icons.fact_check_outlined,
         'What happens after submission?',
-        'The RoadSafe team reviews and verifies reports on the website, then coordinates responder deployment when needed.',
+        'The RoadTrack team reviews and verifies reports on the website, then coordinates responder deployment when needed.',
       ),
       const SizedBox(height: 16),
       _notice(

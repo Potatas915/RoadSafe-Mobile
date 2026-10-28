@@ -17,7 +17,7 @@ void main() {
   final backend = _PreviewBackend();
   runApp(
     MaterialApp(
-      title: 'RoadSafe enforcer preview',
+      title: 'RoadTrack enforcer preview',
       debugShowCheckedModeBanner: false,
       theme: buildRoadSafeTheme(),
       builder: (context, child) => Banner(

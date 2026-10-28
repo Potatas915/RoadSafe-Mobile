@@ -682,7 +682,7 @@ class _ReportTrackingScreenState extends State<ReportTrackingScreen>
           _empty(
             Icons.notifications_none,
             'No updates yet',
-            'Messages from the RoadSafe team about your reports will show up here.',
+            'Messages from the RoadTrack team about your reports will show up here.',
           ),
         ..._updates.map((update) {
           final unread = update['read_at'] == null;
